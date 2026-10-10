@@ -1059,9 +1059,19 @@
 
       // "Users" = live presence (people currently in this room)
       const usersInRoom = state.currentRoomPresence.length;
-      // the owner is an admin in practice: count them once, and show them
-      const adminIdList = [meta.ownerId].concat(meta.admins || []).filter(Boolean);
-      const adminCount = new Set(adminIdList.map(String)).size;
+      // "Admins" = the owner + granted admins who are actually present in this
+      // room right now (matched by the same client id used for presence), so a
+      // lone normal user is not shown as an admin just because the room has one.
+      const presentIds = new Set(
+        (state.currentRoomPresence || [])
+          .map(u => String((u && (u.clientId || u.uid)) || ''))
+          .filter(Boolean)
+      );
+      const adminIdList = new Set(
+        [meta.ownerId].concat(meta.admins || []).filter(Boolean).map(String)
+      );
+      let adminCount = 0;
+      adminIdList.forEach(id => { if (presentIds.has(id)) adminCount += 1; });
 
       banner.innerHTML = `
         <span class="banner-item" id="banner-owner">👑 <strong>Owner:</strong> ${utils.escapeHtml(ownerName)}</span>
