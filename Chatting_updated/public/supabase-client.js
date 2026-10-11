@@ -311,8 +311,11 @@
         return session;
       }).then(function (session) {
         api.uid = session.user.id;
-        api._username = session.user.user_metadata && session.user.user_metadata.username || '';
-        api._avatar = session.user.user_metadata && session.user.user_metadata.avatar || '';
+        // The browser's shared anonymous auth user has no username metadata; keep
+        // any account identity the client already adopted (setUsername) instead of
+        // clobbering it with ''.
+        api._username = (session.user.user_metadata && session.user.user_metadata.username) || api._username || '';
+        api._avatar = (session.user.user_metadata && session.user.user_metadata.avatar) || api._avatar || '';
         return sb.rpc('seed_general');
       }).then(function () {
         api.subscribeRealtime();
@@ -1207,6 +1210,11 @@
 
     resolveName: function (cid) {
       if (!cid) return Promise.resolve(null);
+      // If this id belongs to me (my account / this browser's shared auth uid),
+      // resolve to my CURRENT account name. Message history is sent-time stamped
+      // and the browser uid is reused across accounts, so querying messages here
+      // could resurface the PREVIOUS account's name for a room I now own.
+      if (api.isMine(cid) && isDisplayableUsername(api._username)) return Promise.resolve(api._username);
       return sb.from('messages').select('payload->>username,payload->>clientId')
         .eq('payload->>clientId', cid).limit(1)
         .then(function (r) { return (r.data && r.data[0] && r.data[0].username) || null; })
@@ -1442,6 +1450,14 @@
   // Client-issued identity override (set after a rename)
   api.setClientId = function (id) { api._clientId = id || null; };
   api.setAccountId = function (id) { api._accountId = id || null; };
+  // Adopt the signed-in account's display name/avatar. The shared anonymous auth
+  // user's metadata is empty, so without this the users row keyed by the browser
+  // uid would keep the PREVIOUS account's name and rooms would resolve wrong.
+  api.setUsername = function (u, a) {
+    var n = String(u || '').trim();
+    if (n) api._username = n;
+    if (a !== undefined && a !== null) api._avatar = a || '';
+  };
 
   // ── Public helpers for rendering media (signed URLs) ───────────────────────
   window.PtrMedia = {

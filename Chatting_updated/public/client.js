@@ -936,10 +936,14 @@
         elements.roomRoleTag.style.display = 'none';
       }
 
-      elements.roomOwner.textContent = meta.ownerInfo
-        ? meta.ownerInfo.username
-        : (meta.ownerId ? meta.ownerId.slice(0, 16) + '…' : '-');
-      if (!meta.ownerInfo && meta.ownerId && window.ChatAPI.resolveName) {
+      // If the owner is one of this browser's own identities, show the account
+      // currently signed in here — never a stale users row left by a previous login.
+      const ownerIsMe = meta.ownerId && isMine(meta.ownerId);
+      const ownerName = (ownerIsMe && state.myUsername)
+        ? state.myUsername
+        : (meta.ownerInfo ? meta.ownerInfo.username : '');
+      elements.roomOwner.textContent = ownerName || (meta.ownerId ? meta.ownerId.slice(0, 16) + '…' : '-');
+      if (!ownerName && meta.ownerId && window.ChatAPI.resolveName) {
         window.ChatAPI.resolveName(meta.ownerId).then(n => { if (n) elements.roomOwner.textContent = n; });
       }
 
@@ -957,8 +961,9 @@
           : list.map(u => {
               const isOwnerChip = isMine(u.clientId) || String(u.clientId) === String(meta.ownerId || '');
               const canRemove = state.canManageCurrentRoom && !isOwnerChip && state.currentRoom !== 'general';
-              return `<span class="chip member-chip" title="${utils.escapeHtml(u.username)}">
-                ${utils.escapeHtml(u.username)}${isOwnerChip ? ' 👑' : ''}
+              const chipName = (isMine(u.clientId) && state.myUsername) ? state.myUsername : u.username;
+              return `<span class="chip member-chip" title="${utils.escapeHtml(chipName)}">
+                ${utils.escapeHtml(chipName)}${isOwnerChip ? ' 👑' : ''}
                 ${canRemove ? `<button class="chip-remove" data-action="remove-admin" data-id="${u.clientId}" title="Remove admin">×</button>` : ''}
               </span>`;
             }).join('');
@@ -1053,9 +1058,12 @@
         banner.id = 'room-info-banner';
         elements.messages.parentNode.insertBefore(banner, elements.messages);
       }
-      let ownerName = meta.ownerInfo
-        ? meta.ownerInfo.username
-        : (meta.ownerId ? meta.ownerId.slice(0, 16) + '…' : 'None');
+      const bannerOwnerIsMe = meta.ownerId && isMine(meta.ownerId);
+      let ownerName = (bannerOwnerIsMe && state.myUsername)
+        ? state.myUsername
+        : (meta.ownerInfo
+          ? meta.ownerInfo.username
+          : (meta.ownerId ? meta.ownerId.slice(0, 16) + '…' : 'None'));
 
       // "Users" = live presence (people currently in this room)
       const usersInRoom = state.currentRoomPresence.length;
@@ -1081,7 +1089,7 @@
         <span class="banner-item">🛡 <strong>Admins:</strong> ${adminCount}</span>
         <button class="banner-view-btn" id="banner-view-btn">View Info</button>
       `;
-      if (!meta.ownerInfo && meta.ownerId && window.ChatAPI.resolveName) {
+      if (!bannerOwnerIsMe && !meta.ownerInfo && meta.ownerId && window.ChatAPI.resolveName) {
         window.ChatAPI.resolveName(meta.ownerId).then(n => {
           if (!n) return;
           const el2 = banner.querySelector('#banner-owner');
@@ -1729,6 +1737,11 @@
       if (window.ChatAPI && window.ChatAPI.setClientId) window.ChatAPI.setClientId(state.myClientId);
       if (acct && acct.id && window.ChatAPI && window.ChatAPI.setAccountId) window.ChatAPI.setAccountId(acct.id);
       try { const d = JSON.parse(localStorage.getItem(CONSTANTS.STORAGE_KEY) || '{}'); state.myUsername = d.username || ''; } catch {}
+      // Now that the auth uid exists (ChatAPI.init has resolved), write the
+      // CURRENT account's name into this browser's users row so any room owned
+      // by the uid resolves to the right account, not the previous one.
+      if (window.ChatAPI && window.ChatAPI.setUsername) window.ChatAPI.setUsername(state.myUsername, (utils.loadFromStorage(CONSTANTS.STORAGE_KEY, {}) || {}).avatar || '');
+      if (window.ChatAPI && window.ChatAPI.syncIdentityRow) window.ChatAPI.syncIdentityRow();
       // keep the server-side profile row (name + avatar) in sync
       if (state.myUsername) socket.emit('update-profile', { room: state.currentRoom, username: state.myUsername, avatar: (utils.loadFromStorage(CONSTANTS.STORAGE_KEY, {}) || {}).avatar || '' });
       // tab closed -> offline; tab open -> online even without a room
@@ -3860,19 +3873,26 @@
   }
   function isMineAny(ids) { return Array.isArray(ids) && ids.some((x) => isMine(x)); }
 
-  // One-time repair: rooms created on this browser before the identity fix were
-  // stored with owner_id = the browser's anonymous auth uid, so they showed a
-  // previous account as owner. The server only lets an account claim rooms whose
-  // owner_id is that browser's own uid, so this cannot take someone else's room.
+  // Repair: rooms created on this browser before the identity fix were stored
+  // with owner_id = the browser's anonymous auth uid, so they showed a previous
+  // account as owner. The server only lets an account claim rooms whose owner_id
+  // is that browser's own uid, so this cannot take someone else's room.
+  //
+  // This MUST run on every login, not once: claim_browser_rooms also refreshes
+  // this browser's users row to the signed-in account's name. Gating it with a
+  // one-time flag left that row carrying whichever account last logged in here,
+  // so a re-login showed the previous account as the room owner/admin.
   const ROOMS_CLAIMED_KEY = 'ptr29_rooms_claimed_v1_';
   async function claimRoomsFor(sess) {
     if (!sess || !sess.id || !window.ChatAPI || !window.ChatAPI.claimRooms) return;
     const flag = ROOMS_CLAIMED_KEY + sess.id;
-    try { if (localStorage.getItem(flag) === '1') return; } catch {}
+    let announced = false;
+    try { announced = localStorage.getItem(flag) === '1'; } catch {}
     const res = await window.ChatAPI.claimRooms(sess.id).catch(() => null);
     if (res && res.ok) {
       try { localStorage.setItem(flag, '1'); } catch {}
-      if (res.rooms) {
+      // Only announce a repair the first time we see this account on this browser.
+      if (!announced && res.rooms) {
         showToast('Re-assigned ' + res.rooms + ' room' + (res.rooms === 1 ? '' : 's') +
           ' you created under an older login to ' + (sess.username || 'this account') + '.', 'success');
         if (window.ChatAPI.refreshRooms) window.ChatAPI.refreshRooms();
@@ -4243,7 +4263,11 @@
     } catch {}
     if (window.ChatAPI && window.ChatAPI.setClientId) window.ChatAPI.setClientId(sess.id);
     if (window.ChatAPI && window.ChatAPI.setAccountId) window.ChatAPI.setAccountId(sess.id);
-    if (window.ChatAPI && window.ChatAPI.syncIdentityRow) window.ChatAPI.syncIdentityRow();
+    // Adopt the signed-in account's name/avatar right now, so a room created
+    // before the async 'connect' handshake still writes the CURRENT account into
+    // the users row (previously this ran with an empty username and no-op'd,
+    // leaving the row showing whichever account last used this browser).
+    if (window.ChatAPI && window.ChatAPI.setUsername) window.ChatAPI.setUsername(sess.username, sess.avatar);
     claimRoomsFor(sess);
     document.getElementById('logout-btn')?.addEventListener('click', logout);
     init();
