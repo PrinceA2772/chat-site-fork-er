@@ -2,14 +2,24 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0f172a">
+  <meta name="ptr29-build" content="__BUILD__">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co ws: wss:; media-src 'self' data: blob: https:; manifest-src 'self'; worker-src 'self' blob:; upgrade-insecure-requests">
+  <meta name="application-name" content="ptr_29 Chat">
+  <meta name="apple-mobile-web-app-title" content="ptr_29 Chat">
   <title>ptr_29 Chat</title>
-  <link rel="icon" href="data:,">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="site.webmanifest">
   <style>
     :root {
+      color-scheme: dark;
       --bg: #0f172a;
       --panel: #0b1220;
       --panel2: #111827;
@@ -28,6 +38,15 @@
     }
     
     * { box-sizing: border-box; }
+    html { color-scheme: dark; }
+    html { height: -webkit-fill-available; }
+    html, body { max-width: 100%; overflow-x: hidden; }
+    /* prevent iOS zoom on any text input: 16px minimum */
+    input[type="text"], input[type="url"], input[type="search"] { font-size: 16px; }
+    @media (min-width: 769px) {
+      input[type="text"], input[type="url"], input[type="search"] { font-size: 14px; }
+      #text { font-size: 14px; }
+    }
     
     body {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
@@ -37,13 +56,21 @@
       display: flex;
       flex-direction: column;
       height: 100vh;
+      height: 100dvh;
+      height: -webkit-fill-available;
+      min-height: 100vh;
+      min-height: 100dvh;
       line-height: 1.4;
       font-size: 14px;
       overflow: hidden;
+      /* allow notches: header will use safe-area-inset */
+      padding-top: env(safe-area-inset-top, 0px);
+      box-sizing: border-box;
     }
     
     header {
       padding: 12px 16px;
+      padding-top: calc(12px + env(safe-area-inset-top, 0px));
       background: linear-gradient(135deg, var(--panel2), var(--panel) 60%, var(--bg));
       border-bottom: 1px solid var(--border);
       display: flex;
@@ -68,6 +95,8 @@
     main {
       display: flex;
       flex: 1;
+      min-height: 0;
+      min-width: 0;
       overflow: hidden;
     }
     
@@ -224,6 +253,7 @@
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
+      align-items: center;
     }
     
     /* Chat area */
@@ -232,6 +262,7 @@
       display: flex;
       flex-direction: column;
       min-width: 0;
+      position: relative;   /* anchors the jump-to-newest button */
       background: 
         radial-gradient(1200px 60% at 100% 0%, rgba(37,99,235,0.06), transparent 60%),
         radial-gradient(900px 50% at 0% 100%, rgba(124,58,237,0.05), transparent 60%);
@@ -324,9 +355,15 @@
       padding: 2px 10px;
       font-size: 0.75rem;
       cursor: pointer;
-      color: var(--accent);
+      /* --accent (#2563eb) on the dark panel reads as near-invisible blue;
+         dark mode uses a light blue, light mode a deep blue */
+      color: #93c5fd;
+      border-color: rgba(147,197,253,.45);
+      font-weight: 600;
     }
-    .banner-view-btn:hover { background: var(--accent); color: white; }
+    .banner-view-btn:hover { background: #2563eb; color: #ffffff; border-color: #2563eb; }
+    html.ptr29-light-theme .banner-view-btn { color: #1d4ed8; border-color: rgba(29,78,216,.40); }
+    html.ptr29-light-theme .banner-view-btn:hover { background: #1d4ed8; color: #ffffff; border-color: #1d4ed8; }
     
     .username-hint { font-size: 11px; margin-top: 3px; min-height: 15px; transition: color 0.2s; }
     .username-hint.available { color: #27ae60; }
@@ -338,7 +375,7 @@
     
     #typing {
       min-height: 24px;
-      color: var(--accent);
+      color: #93c5fd;
       font-size: 13px;
       padding: 4px 16px;
       font-style: italic;
@@ -353,9 +390,85 @@
       gap: 12px;
       align-items: flex-start;
     }
-    
+
+    /* ── Load older messages ─────────────────────────────────────────────
+       Sits at the top of the transcript. History loads in pages so joining a
+       room does not pull an entire room's backlog every time. */
+    #load-older-btn {
+      align-self: center;
+      margin: 0 auto 4px;
+      padding: 7px 16px;
+      font-size: 12.5px;
+      border-radius: 999px;
+      cursor: pointer;
+      background: var(--panel2);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      transition: background .15s ease, color .15s ease, border-color .15s ease;
+    }
+    #load-older-btn:hover:not(:disabled) {
+      background: var(--panel);
+      color: var(--text);
+      border-color: var(--border-light);
+    }
+    #load-older-btn:disabled,
+    #load-older-btn.exhausted {
+      cursor: default;
+      opacity: .6;
+      font-style: italic;
+    }
+    html.ptr29-light-theme #load-older-btn {
+      background: #eef2f7;
+      color: #3f4c60;
+      border-color: #dbe3ec;
+    }
+    html.ptr29-light-theme #load-older-btn:hover:not(:disabled) {
+      background: #e2e8f0;
+      color: #0b1526;
+    }
+    html.ptr29-halloween body.ptr29-halloween #load-older-btn {
+      background: rgba(40, 18, 68, .72);
+      color: #d3b8ef;
+      border-color: rgba(168, 85, 247, .30);
+    }
+    html.ptr29-halloween body.ptr29-halloween #load-older-btn:hover:not(:disabled) {
+      background: rgba(74, 30, 116, .84);
+      color: #f5ecff;
+      border-color: rgba(255, 138, 44, .50);
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #load-older-btn {
+      background: rgba(255, 250, 242, .92);
+      color: #6b4423;
+      border-color: rgba(154, 82, 12, .26);
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #load-older-btn:hover:not(:disabled) {
+      background: rgba(255, 236, 214, .96);
+      color: #3d1f0a;
+      border-color: rgba(194, 104, 16, .46);
+    }
+    html.ptr29-christmas body.ptr29-christmas #load-older-btn {
+      background: rgba(20, 38, 74, .72);
+      color: #cfe0f8;
+      border-color: rgba(120, 180, 255, .26);
+    }
+    html.ptr29-christmas body.ptr29-christmas #load-older-btn:hover:not(:disabled) {
+      background: rgba(229, 53, 47, .22);
+      color: #ffe4e0;
+      border-color: rgba(255, 96, 96, .50);
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #load-older-btn {
+      background: rgba(255, 255, 255, .92);
+      color: #24405f;
+      border-color: rgba(24, 78, 140, .22);
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #load-older-btn:hover:not(:disabled) {
+      background: rgba(229, 53, 47, .14);
+      color: #6f0d13;
+      border-color: rgba(190, 30, 40, .46);
+    }
+
     .sys {
-      color: var(--accent);
+      color: #93c5fd;
       font-size: 12px;
       opacity: 0.85;
       text-align: center;
@@ -365,7 +478,9 @@
     }
     
     .msg {
-      max-width: 70%;
+      max-width: min(70%, 560px);
+      width: fit-content;
+      min-width: 120px;
       background: var(--panel2);
       border: 1px solid var(--border);
       border-radius: 12px;
@@ -464,9 +579,11 @@
     
     .msg img.msg-image {
       display: block;
-      max-width: 240px;
-      max-height: 240px;
-      border-radius: 8px;
+      max-width: min(330px, 100%);
+      max-height: 420px;
+      width: auto;
+      height: auto;
+      border-radius: 10px;
       border: 1px solid var(--border);
       background: var(--panel);
       object-fit: contain;
@@ -478,6 +595,74 @@
       margin-top: 6px;
       font-size: 11px;
       color: var(--text-dim);
+      overflow-wrap: anywhere;
+    }
+    /* On your own bubble the background is a blue→violet gradient, so the
+       default dim grey vanished. Give each context its own readable tone. */
+    .msg.me .receipts { color: rgba(255,255,255,.85); }
+    html.ptr29-light-theme .msg.me .receipts { color: #1e3a8a !important; }
+    html.ptr29-light-theme .receipts { color: #46586f; }
+    /* ── Jump-to-newest button ─────────────────────────────────────────── */
+    .msg.me .receipts-more {
+      background: rgba(255,255,255,.24) !important;
+      color: #ffffff !important;
+    }
+    html.ptr29-light-theme .msg.me .receipts-more {
+      background: rgba(30,58,138,.18) !important;
+      color: #1e3a8a !important;
+    }
+    #scroll-bottom {
+      position: absolute;
+      right: 18px;
+      bottom: calc(var(--ptr29-composer-h, 74px) + 14px);
+      z-index: 45;
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      border-radius: 50%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      line-height: 1;
+      box-shadow: 0 10px 26px rgba(0,0,0,.35);
+    }
+    #scroll-bottom.show { display: inline-flex; }
+    #scroll-bottom-badge {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 9px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 10.5px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,.35);
+    }
+    #scroll-bottom-badge[hidden] { display: none; }
+    .ptr29-mobile #scroll-bottom {
+      right: 12px;
+      bottom: calc(var(--ptr29-composer-h, 74px) + var(--mobile-nav-h, 56px) + 12px);
+      width: 40px;
+      height: 40px;
+    }
+
+    .receipts-more {
+      display: inline-block;
+      margin-left: 4px;
+      padding: 1px 7px;
+      border-radius: 10px;
+      background: rgba(37,99,235,0.16);
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 10.5px;
+      line-height: 1.5;
     }
     
     .reply-preview {
@@ -596,16 +781,22 @@
       display: flex;
       flex-wrap: wrap;
       gap: 4px;
-      margin-top: 4px;
+      margin-top: 6px;
     }
-    
+    .reactions:empty { display: none; }
+
     .reaction-pill {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      padding: 2px 6px;
-      background: var(--surface);
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: var(--panel2);
       border: 1px solid var(--border);
+      color: var(--text);
+      cursor: pointer;
+      transition: transform .12s ease, background .12s ease, border-color .12s ease;
       border-radius: 12px;
       font-size: 11px;
       cursor: pointer;
@@ -613,14 +804,22 @@
     }
     
     .reaction-pill:hover {
-      background: var(--bg-hover);
+      background: var(--panel);
+      border-color: var(--border-light);
+      transform: scale(1.08);
     }
-    
+
     .reaction-pill.active {
-      background: var(--accent);
-      color: white;
+      background: rgba(37, 99, 235, 0.16);
       border-color: var(--accent);
+      color: var(--text);
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25) inset;
     }
+
+    #react-picker-popup { animation: popIn .16s ease; }
+    #react-picker-popup button { transition: transform .1s ease, background .1s ease; }
+    #react-picker-popup button:hover { background: var(--panel) !important; transform: scale(1.15); }
+    @keyframes popIn { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
     
     .mention {
       color: var(--accent);
@@ -637,7 +836,105 @@
     .msg-content em {
       font-style: italic;
     }
+
+    /* Links must stay readable on every bubble and in both themes. The old
+       single accent colour disappeared against dark bubbles / own-message
+       gradients, so each context gets its own tone. */
+    .msg-content a.safe-link {
+      color: #93c5fd;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      word-break: break-all;
+      font-weight: 500;
+    }
+    .msg.me .msg-content a.safe-link { color: #e0f2fe; }
+    html.ptr29-light-theme .msg-content a.safe-link { color: #1d4ed8; }
+    html.ptr29-light-theme .msg.me .msg-content a.safe-link { color: #1e3a8a; }
+    .msg-content a.safe-link:hover { color: #bfdbfe; }
+    html.ptr29-light-theme .msg-content a.safe-link:hover { color: #1e40af; }
+
+    .msg-content a.safe-link::after {
+      content: " ↗";
+      font-size: 11px;
+      opacity: .8;
+    }
     
+    /* ── Search: match counter, navigation and highlights ─────────────── */
+    .search-count {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      padding: 0 2px;
+    }
+    .search-nav { padding: 4px 8px; font-size: 12px; line-height: 1; }
+    .search-nav.search-cancel { font-weight: 700; }
+    mark.search-hit {
+      background: #fde68a;
+      color: #111827;
+      border-radius: 3px;
+      padding: 0 1px;
+    }
+    mark.search-hit.active {
+      background: #f59e0b;
+      box-shadow: 0 0 0 2px rgba(245,158,11,.55);
+    }
+    html.ptr29-light-theme mark.search-hit { background: #fde68a; color: #111827; }
+    html.ptr29-light-theme mark.search-hit.active { background: #f59e0b; }
+
+    /* ── @mention autocomplete ────────────────────────────────────────── */
+    .mention-menu {
+      position: fixed;
+      z-index: 12000;
+      min-width: 190px;
+      max-width: min(300px, 90vw);
+      max-height: 240px;
+      overflow-y: auto;
+      background: var(--panel2);
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      box-shadow: 0 18px 44px rgba(0,0,0,.45);
+      padding: 6px;
+    }
+    .mention-menu .mention-head {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--text-dim);
+      padding: 4px 8px 6px;
+    }
+    .mention-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 8px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .mention-item.active,
+    .mention-item:hover { background: var(--border); }
+    .mention-item img { width: 22px; height: 22px; border-radius: 50%; flex: 0 0 auto; }
+    .mention-item .mi-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mention-item .mi-dot { margin-left: auto; font-size: 10px; color: #34d399; }
+    .mention-item.offline .mi-name { color: var(--text-muted); }
+    .mention-empty { padding: 8px; font-size: 12.5px; color: var(--text-dim); }
+
+    /* mention chips inside messages */
+    .mention {
+      color: #93c5fd;
+      background: rgba(147,197,253,.14);
+      border-radius: 6px;
+      padding: 0 4px;
+      font-weight: 600;
+    }
+    .msg.me .mention { color: #e0f2fe; background: rgba(255,255,255,.18); }
+    .mention.mention-me { color: #fef3c7; background: rgba(245,158,11,.24); }
+    .msg.me .mention.mention-me { color: #fff7ed; background: rgba(255,255,255,.28); }
+    html.ptr29-light-theme .mention { color: #1d4ed8; background: rgba(29,78,216,.10); }
+    html.ptr29-light-theme .msg.me .mention { color: #1e3a8a; background: rgba(30,58,138,.12); }
+    html.ptr29-light-theme .mention.mention-me { color: #92400e; background: rgba(245,158,11,.22); }
+
     .emoji-picker-popup {
       position: absolute;
       bottom: 70px;
@@ -744,6 +1041,18 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
+
+    .people-toggle { display: flex; gap: 4px; margin-top: 8px; }
+    .pt-btn {
+      flex: 1; padding: 5px 8px; font-size: 11px; border-radius: 6px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--text-muted); cursor: pointer;
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .pt-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    #offline-list { flex: 1; overflow-y: auto; padding: 12px; }
+    #offline-list .online-item img { opacity: .5; filter: grayscale(1); }
+    #offline-list .online-item .name { opacity: .8; }
     
     #online-list {
       flex: 1;
@@ -1007,7 +1316,10 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
+      /* Toasts are informational only — never intercept taps meant for buttons */
+      pointer-events: none;
     }
+    .toast { pointer-events: none; }
     
     .toast {
       background: var(--panel2);
@@ -1275,6 +1587,7 @@
       line-height: 1.4;
     }
     .help-tips li strong { color: var(--text); }
+    .help-tips a { color: #93c5fd; text-underline-offset: 2px; }
     
     .help-nav {
       display: flex;
@@ -1334,17 +1647,2598 @@
     }
     .flash-in { animation: flashIn 1.2s ease forwards; }
     
-    .mobile-only { display: none !important; }
+    .mobile-only { display: none; }
+    .show-desktop-only { display: inline; }
+    .show-tablet-only { display: none; }
+    .show-mobile-only { display: none; }
     .lightbox img { max-height: 92dvh; }
+    /* Prevent horizontal clipping on narrow screens */
+    .file-attachment, .body, .reply-preview { max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+    img, video { max-width: 100%; height: auto; }
+    /* iOS tap highlight off, better scroll */
+    * { -webkit-tap-highlight-color: transparent; }
+    main, #messages, #room-list, #online-list { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+
+    #tour-overlay{pointer-events:none}
+    #tour-card{pointer-events:auto}
+    .online-menu-btn{margin-left:auto;flex-shrink:0;background:transparent;border:none;color:var(--text-dim);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:15px;line-height:1;opacity:.5;transition:opacity .15s,background .15s,color .15s}
+    .online-menu-btn:hover{opacity:1;background:var(--panel2);color:var(--text)}
+    .online-menu{position:fixed;z-index:99995;background:var(--panel);border:1px solid var(--border-light);border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.45);padding:6px;min-width:190px}
+    .online-menu button{display:block;width:100%;text-align:left;background:none;border:none;color:var(--text);padding:9px 10px;border-radius:6px;font-size:13px;cursor:pointer}
+    .online-menu button:hover{background:var(--panel2)}
+    .profile-open{cursor:pointer}
+    .profile-open:hover{opacity:.85;text-decoration:underline}
+    .online-item{cursor:pointer}
+    .member-chip{cursor:pointer}
+    #inbox-btn{position:relative}
+    #inbox-badge{position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;border-radius:9px;background:var(--danger);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+    #inbox-badge[hidden]{display:none!important}
+    .inbox-popup{position:fixed;right:16px;top:74px;z-index:10001;width:min(360px,calc(100vw - 32px));background:var(--panel2);border:1px solid var(--border-light);border-radius:14px;box-shadow:0 18px 44px rgba(0,0,0,.45);padding:14px;color:var(--text);animation:popIn .16s ease-out}
+    .inbox-popup-title{font-weight:800;font-size:14px;margin-bottom:4px}.inbox-popup-body{font-size:13px;color:var(--text-muted);line-height:1.45;overflow-wrap:anywhere}.inbox-popup-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}.inbox-popup-actions button{padding:8px 12px;font-size:12px}
+    @media (max-width:768px){.inbox-popup{left:12px;right:12px;top:calc(70px + env(safe-area-inset-top));width:auto}}
+    #user-profile-modal .up-stat{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center}
+    #user-profile-modal .up-stat b{display:block;font-size:18px;color:var(--text)}
+    #user-profile-modal .up-stat span{font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.6px}
+
+    /* ── Guided onboarding tour ─────────────────────────────────────────── */
+    #tour-overlay{position:fixed;inset:0;z-index:99989;display:none}
+    #tour-overlay.open{display:block}
+    #tour-spot{position:fixed;z-index:99990;display:none;border-radius:12px;pointer-events:none;
+      box-shadow:0 0 0 9999px rgba(4,8,16,.78),0 0 0 2px var(--accent),0 0 22px var(--accent);
+      transition:opacity .25s ease}
+    #tour-spot.tour-pulse{animation:tourPulse 1.9s ease-in-out infinite}
+    @keyframes tourPulse{0%,100%{box-shadow:0 0 0 9999px rgba(4,8,16,.78),0 0 0 2px var(--accent),0 0 22px var(--accent)}50%{box-shadow:0 0 0 9999px rgba(4,8,16,.78),0 0 0 3px var(--accent),0 0 34px var(--accent)}}
+    #tour-card{position:fixed;z-index:99991;display:none;max-width:min(360px,92vw);
+      background:var(--panel);border:1px solid var(--border-light);border-radius:14px;
+      padding:16px 16px 12px;box-shadow:0 18px 50px rgba(0,0,0,.55);
+      transition:opacity .25s ease,transform .3s ease}
+    #tour-card.hidden{opacity:0;transform:translateY(10px)}
+    #tour-card h4{margin:0 0 6px;color:var(--text);font-size:15px}
+    #tour-card p{margin:0 0 12px;color:var(--text-muted);font-size:13px;line-height:1.55}
+    #tour-card .tour-nav{display:flex;gap:8px;align-items:center}
+    #tour-card .tour-step-count{margin-right:auto;color:var(--text-dim);font-size:11px}
+
+    /* ── Brand logo ──────────────────────────────────────────────── */
+    .brand { display: flex; align-items: center; gap: 10px; user-select: none; }
+    .brand svg { filter: drop-shadow(0 0 7px rgba(59,130,246,.5)); flex-shrink: 0; }
+    .brand-name { font-size: 17px; font-weight: 700; letter-spacing: .3px; color: var(--text); white-space: nowrap; }
+    .bn-accent { background: linear-gradient(90deg,#22d3ee,#3b82f6 55%,#a855f7); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 800; }
+
+    /* ── Account gate (centered, branded) ────────────────────────── */
+    .ag-overlay { position: fixed; inset: 0; z-index: 99999; display: flex; align-items: center; justify-content: center; padding: 18px; background: rgba(4,8,18,.74); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); overflow: auto; }
+    .ag-card { width: min(440px, 100%); background: linear-gradient(180deg, var(--panel), var(--panel2)); border: 1px solid var(--border-light); border-radius: 18px; padding: 26px 26px 20px; box-shadow: 0 24px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(59,130,246,.14), 0 0 46px rgba(59,130,246,.12); animation: ag-pop .3s cubic-bezier(.2,.9,.3,1.15); }
+    @keyframes ag-pop { from { opacity: 0; transform: translateY(16px) scale(.97); } to { opacity: 1; transform: none; } }
+    .ag-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .ag-brand svg { filter: drop-shadow(0 0 8px rgba(59,130,246,.55)); }
+    .ag-title { font-size: 21px; font-weight: 800; color: var(--text); }
+    .ag-title b { background: linear-gradient(90deg,#22d3ee,#3b82f6 55%,#a855f7); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .ag-sub { font-size: 12.5px; line-height: 1.6; color: var(--text-muted); margin: 0 0 16px; }
+    .ag-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 4px; margin-bottom: 14px; }
+    .ag-tab { border: 0; background: transparent; color: var(--text-muted); font-weight: 700; font-size: 11.5px; letter-spacing: .7px; text-transform: uppercase; padding: 9px 0; border-radius: 8px; cursor: pointer; transition: all .15s ease; }
+    .ag-tab.active { background: linear-gradient(90deg,#2563eb,#7c3aed); color: #fff; box-shadow: 0 4px 14px rgba(37,99,235,.35); }
+    .ag-card input { width: 100%; margin-bottom: 10px; }
+    .ag-card input[type="checkbox"] { width: auto; min-width: 18px; height: 18px; margin: 1px 0 0; flex: 0 0 auto; accent-color: var(--accent); }
+    .ag-card label input[type="checkbox"] + span { flex: 1; min-width: 0; }
+    @media (max-width: 768px) {
+      .ag-overlay { align-items: flex-start; padding: calc(14px + env(safe-area-inset-top, 0px)) 12px calc(14px + env(safe-area-inset-bottom, 0px)); }
+      .ag-card { width: min(100%, 440px); max-height: calc(100dvh - 28px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-y: auto; border-radius: 16px; padding: 20px 18px 18px; }
+      .ag-title { font-size: 19px; }
+      .ag-sub { font-size: 12px; line-height: 1.5; }
+      .ag-tab { min-height: 42px; }
+      .ag-go { min-height: 46px; }
+    }
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .ag-card { width: min(460px, 88vw); max-height: 88dvh; overflow-y: auto; }
+    }
+    .ag-err { color: var(--danger); font-size: 12px; min-height: 18px; margin: 2px 0 10px; word-break: break-word; }
+    .ag-go { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(90deg,#2563eb,#7c3aed); border: none; color: #fff; font-weight: 700; font-size: 14px; padding: 12px 0; border-radius: 10px; cursor: pointer; box-shadow: 0 6px 18px rgba(37,99,235,.35); transition: filter .15s ease, transform .05s ease; }
+    .ag-go:hover { filter: brightness(1.1); }
+    .ag-go:active { transform: translateY(1px); }
+    .ag-go:disabled { opacity: .6; cursor: wait; }
+    .ag-foot { margin-top: 12px; font-size: 11px; color: var(--text-dim); text-align: center; }
+
+    /* ── Tablet people toggle — hidden by default (desktop/mobile) ────── */
+    #tablet-people-btn { display: none; }
+
+    /* ── Tablet view (769px–1024px) ──────────────────────────────────────── */
+    @media (min-width: 769px) and (max-width: 1024px) {
+      /* Show the people toggle button */
+      #tablet-people-btn { display: inline-flex; }
+      /* Narrow the sidebar */
+      #sidebar { width: 220px; min-width: 180px; }
+      /* Strip text labels from room-bar buttons — show icon only */
+      #room-bar button span { display: none; }
+      #room-bar button { padding: 8px 10px; min-width: 36px; }
+      /* Narrower search input */
+      #search-messages-input { width: 100px; font-size: 11px; }
+      /* Compact header */
+      header { padding: 10px 12px; gap: 8px; }
+      header h1 { font-size: 16px; }
+      header .header-actions a.secondary {
+        padding: 6px 12px;
+        font-size: 12px;
+      }
+      /* People panel becomes a slide-in overlay */
+      #online-panel {
+        display: none !important;
+        position: fixed;
+        top: 0; right: 0; bottom: 0;
+        width: 280px;
+        max-width: 85vw;
+        z-index: 9000;
+        box-shadow: -4px 0 24px rgba(0,0,0,0.5);
+        transform: translateX(100%);
+        transition: transform 0.25s ease;
+      }
+      #online-panel.tablet-open {
+        display: flex !important;
+        transform: translateX(0);
+      }
+      /* Backdrop behind the slide-in */
+      #tablet-people-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.45);
+        z-index: 8999;
+      }
+      #tablet-people-backdrop.open { display: block; }
+
+      /* ── Help modal ────────────────────────────────────────────────── */
+      .help-modal-inner {
+        width: 94vw;
+        max-height: 92dvh;
+        min-height: 0;
+      }
+      .help-slide {
+        flex-direction: column;
+        gap: 16px;
+        padding: 18px 20px;
+      }
+      .help-demo {
+        width: 100%;
+        flex-shrink: 0;
+      }
+      .help-header { padding: 14px 18px 12px; gap: 10px; }
+      .help-logo { font-size: 26px; }
+      .help-title { font-size: 17px; }
+      .help-sub { font-size: 12px; }
+      .help-dots { padding: 10px 0 4px; }
+      .help-nav { padding: 10px 18px 16px; }
+      .help-prev, .help-next { padding: 7px 14px; font-size: 12px; }
+      .help-text h3 { font-size: 15px; }
+      .help-text p { font-size: 12px; margin-bottom: 8px; }
+      .help-tips li { font-size: 11px; padding: 6px 8px; }
+
+      /* ── Device-specific content visibility ─────────────────────── */
+      .show-desktop-only { display: none !important; }
+      .show-tablet-only { display: inline !important; }
+      .show-mobile-only { display: none !important; }
+      .show-tablet-only b { display: inline; }
+
+      /* ── Chat input area ──────────────────────────────────────────── */
+      #username { width: 90px; }
+      #text { min-width: 0; font-size: 13px; }
+      #chat-form { gap: 5px; }
+      #chat-form button { padding: 6px 10px; font-size: 13px; }
+      #send-btn .send-label { display: none; }
+      #send-btn .send-icon { display: inline; font-size: 15px; }
+      #input-area { padding: 8px 12px; }
+
+      /* ── Standard modals ───────────────────────────────────────────── */
+      .modal {
+        width: 94%;
+        max-width: 440px;
+        padding: 20px;
+        border-radius: 14px;
+      }
+      .modal h3 { font-size: 16px; }
+      .modal p { font-size: 13px; }
+      .modal-actions { gap: 10px; }
+      .modal-actions button { padding: 8px 14px; font-size: 13px; }
+    }
+
+    /* ── Tablet/mobile polish for recent contact/inbox/verification UI ── */
+    @media (min-width: 769px) and (max-width: 1024px) {
+      header .header-actions { gap: 6px; flex-shrink: 0; }
+      header .header-actions a.secondary { display: none !important; }
+      header .header-actions button { min-width: 38px; height: 38px; padding: 7px 10px; }
+      #contact-modal .modal,
+      #inbox-modal .modal,
+      #user-profile-modal .modal { width: min(560px, calc(100vw - 40px)) !important; max-width: calc(100vw - 40px) !important; }
+      #contact-modal a.secondary { white-space: normal !important; overflow-wrap: anywhere; }
+      #tour-card { max-width: min(360px, calc(100vw - 28px)) !important; }
+      .inbox-popup { max-width: calc(100vw - 32px); }
+    }
+    @media (max-width: 768px) {
+      #contact-modal .modal,
+      #inbox-modal .modal,
+      #user-profile-modal .modal { width: calc(100vw - 24px) !important; max-width: calc(100vw - 24px) !important; }
+      #contact-modal a.secondary { white-space: normal !important; overflow-wrap: anywhere; }
+      #tour-card { max-width: calc(100vw - 24px) !important; }
+    }
+
+    /* ── Tablet panel reliability patch ── */
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .modal-overlay.open { z-index: 100000 !important; pointer-events: auto !important; }
+      #contact-modal .modal,
+      #inbox-modal .modal,
+      #user-profile-modal .modal,
+      #edit-profile-modal .modal,
+      #create-room-modal .modal,
+      #delete-user-modal .modal,
+      #delete-room-modal .modal {
+        width: min(620px, calc(100vw - 36px)) !important;
+        max-width: calc(100vw - 36px) !important;
+        max-height: 88dvh !important;
+        overflow-y: auto !important;
+        box-sizing: border-box !important;
+      }
+      #room-settings-panel {
+        max-width: calc(100vw - 280px) !important;
+        min-width: 0 !important;
+        overflow-x: hidden !important;
+      }
+      #room-settings-panel .settings-row,
+      #room-settings-panel input,
+      #room-settings-panel button { min-width: 0 !important; }
+      .online-menu { max-width: calc(100vw - 20px) !important; z-index: 95000 !important; }
+      .inbox-popup { max-width: calc(100vw - 24px) !important; z-index: 95000 !important; }
+    }
+
+
+
+    /* ═══════════════════════════════════════════════════════════════════
+       Safe motion interaction layer
+       Subtle transitions only: no global perspective/3D transforms because
+       those distort menus, popups, sticky panels and mobile overlays.
+       ═══════════════════════════════════════════════════════════════════ */
+    :root {
+      --motion-fast: 130ms;
+      --motion-med: 220ms;
+      --ease-soft: cubic-bezier(.2,.8,.2,1);
+      --soft-shadow-sm: 0 6px 14px rgba(0,0,0,.18);
+      --soft-shadow-md: 0 12px 28px rgba(0,0,0,.24);
+    }
+
+    @keyframes ptr29SoftIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    header {
+      box-shadow: 0 8px 24px rgba(0,0,0,.22);
+    }
+
+    button,
+    .secondary,
+    .room,
+    .msg,
+    .online-item,
+    .reaction-pill,
+    .file-attachment,
+    .mobile-nav-btn,
+    .pt-btn,
+    .chip,
+    .room-tag {
+      transition:
+        transform var(--motion-fast) var(--ease-soft),
+        box-shadow var(--motion-fast) var(--ease-soft),
+        background var(--motion-fast) ease,
+        border-color var(--motion-fast) ease,
+        color var(--motion-fast) ease,
+        opacity var(--motion-fast) ease;
+    }
+
+    button:hover:not(:disabled),
+    .secondary:hover:not(:disabled),
+    .pt-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: var(--soft-shadow-sm);
+    }
+    button:active:not(:disabled),
+    .secondary:active:not(:disabled),
+    .pt-btn:active:not(:disabled) {
+      transform: translateY(1px);
+      box-shadow: inset 0 2px 8px rgba(0,0,0,.18);
+    }
+
+    .room:hover {
+      transform: translateX(2px);
+      box-shadow: var(--soft-shadow-sm);
+    }
+    .msg {
+      animation: ptr29SoftIn var(--motion-med) var(--ease-soft) both;
+    }
+    .msg:hover,
+    .msg.actions-visible {
+      box-shadow: var(--soft-shadow-sm);
+    }
+    #text:focus,
+    #search-messages-input:focus,
+    #people-search:focus,
+    input:focus,
+    textarea:focus {
+      box-shadow: 0 0 0 3px rgba(37,99,235,.18), inset 0 1px 0 rgba(255,255,255,.04);
+    }
+
+    /* Menus/popups/modals stay geometrically stable. */
+    .context-menu,
+    .online-menu,
+    .emoji-picker-popup,
+    #emoji-input-popup,
+    #react-picker-popup,
+    .modal,
+    .help-modal-inner,
+    .ag-card,
+    #tour-card,
+    .inbox-popup {
+      transform: none;
+      transform-style: flat;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.001ms !important;
+      }
+      button:hover,
+      .secondary:hover,
+      .room:hover,
+      .msg:hover,
+      .online-item:hover,
+      .mobile-nav-btn.active {
+        transform: none !important;
+      }
+    }
+
+    @media (max-width: 768px) {
+      button:hover:not(:disabled),
+      .secondary:hover:not(:disabled),
+      .pt-btn:hover:not(:disabled),
+      .room:hover,
+      .msg:hover,
+      .online-item:hover {
+        transform: none;
+      }
+      .msg.actions-visible { transform: none; }
+    }
+
+
+    /* ── Light theme composer/panel polish ───────────────────────────── */
+    html.ptr29-light-theme body {
+      background: var(--bg);
+    }
+    html.ptr29-light-theme #chat,
+    html.ptr29-light-theme #messages {
+      background: var(--bg);
+    }
+    html.ptr29-light-theme #chat-form {
+      background: linear-gradient(180deg, rgba(255,255,255,.88), var(--composer-bg, #f8fafc));
+      border-top: 1px solid var(--border);
+      box-shadow: 0 -10px 26px rgba(15, 23, 42, .08);
+    }
+    html.ptr29-light-theme #online-panel,
+    html.ptr29-light-theme #sidebar {
+      background: #ffffff;
+    }
+    html.ptr29-light-theme #text,
+    html.ptr29-light-theme #username,
+    html.ptr29-light-theme #avatar,
+    html.ptr29-light-theme #search-messages-input,
+    html.ptr29-light-theme #people-search,
+    html.ptr29-light-theme input,
+    html.ptr29-light-theme select,
+    html.ptr29-light-theme textarea {
+      background: var(--composer-surface, #fff);
+      border-color: var(--border-light);
+      color: var(--text);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+    }
+    html.ptr29-light-theme #emoji-btn,
+    html.ptr29-light-theme #file-btn,
+    html.ptr29-light-theme #image-btn,
+    html.ptr29-light-theme button.secondary {
+      background: #e9eff6;
+      color: var(--text);
+      border-color: var(--border);
+    }
+    html.ptr29-light-theme #send-btn {
+      box-shadow: 0 10px 24px rgba(37, 99, 235, .22);
+    }
+
+
+    /* ── Tablet-only composer reliability (769px–1024px) ─────────────── */
+    @media (min-width: 769px) and (max-width: 1024px) {
+      #input-area {
+        flex: 0 0 auto;
+        padding: 10px 12px;
+        background: var(--panel2) !important;
+        border-top: 1px solid var(--border-light);
+        box-shadow: 0 -10px 24px rgba(0,0,0,.18);
+        box-sizing: border-box;
+      }
+      #chat-form {
+        display: grid !important;
+        grid-template-columns: minmax(120px, 180px) 50px minmax(0, 1fr) 50px 50px 74px;
+        align-items: center !important;
+        gap: 8px !important;
+        width: 100%;
+        min-width: 0;
+      }
+      #username,
+      #text,
+      #chat-form button {
+        height: 50px !important;
+        min-height: 50px !important;
+        margin: 0 !important;
+        box-sizing: border-box;
+        border-radius: 12px;
+      }
+      #username { width: auto !important; min-width: 0 !important; padding: 0 14px; }
+      #text { min-width: 0 !important; width: 100% !important; padding: 0 16px; line-height: 50px; }
+      #emoji-btn,
+      #file-btn,
+      #image-btn {
+        width: 50px !important;
+        min-width: 50px !important;
+        padding: 0 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
+      #send-btn {
+        width: 74px !important;
+        min-width: 74px !important;
+        padding: 0 12px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
+      html.ptr29-light-theme #input-area { background: var(--composer-bg, #f8fafc) !important; box-shadow: 0 -8px 20px rgba(15,23,42,.08) !important; }
+      html.ptr29-light-theme #emoji-btn,
+      html.ptr29-light-theme #file-btn,
+      html.ptr29-light-theme #image-btn { background: #e7edf5 !important; border-color: #d7e0eb !important; color: var(--text) !important; }
+    }
+
+
+    /* ── Tablet composer viewport anchor (769px–1024px) ─────────────── */
+    @media (min-width: 769px) and (max-width: 1024px) {
+      :root { --ptr29-keyboard-offset: 0px; --ptr29-composer-h: 72px; }
+      #chat { position: relative; overflow: hidden; }
+      #input-area {
+        position: sticky;
+        bottom: var(--ptr29-keyboard-offset, 0px);
+        z-index: 70;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+      #messages { padding-bottom: 12px; }
+    }
+
+
+    /* ── Image messages hug the image instead of stretching wide ─────── */
+    .msg.image-msg {
+      width: fit-content;
+      min-width: 0;
+      max-width: min(92%, 520px);
+      padding: 10px;
+    }
+    .msg.image-msg .body {
+      display: inline-block;
+      line-height: 0;
+      max-width: 100%;
+    }
+    .msg.image-msg img.msg-image {
+      margin-top: 0;
+      max-width: min(480px, 78vw);
+      display: block;
+    }
+    .msg.image-msg .meta {
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+
+
+    /* ── Safe link preview cards ─────────────────────────────────────── */
+    .link-previews {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+      max-width: 100%;
+    }
+    .link-preview-card {
+      display: block;
+      width: min(450px, 100%);
+      overflow: hidden;
+      border: 1px solid var(--border-light);
+      border-radius: 18px;
+      background: var(--panel);
+      color: var(--text);
+      text-decoration: none;
+      box-shadow: 0 10px 22px rgba(0,0,0,.18);
+    }
+    .link-preview-card::after { content: none !important; }
+    .link-preview-top {
+      padding: 10px 14px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      font-weight: 800;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .link-preview-main {
+      display: flex;
+      gap: 12px;
+      padding: 12px;
+      align-items: center;
+      min-width: 0;
+    }
+    .link-preview-thumb {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      flex: 0 0 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.18), transparent 35%), var(--panel2);
+      border: 1px solid var(--border);
+    }
+    .link-preview-thumb .link-preview-glyph { font-size: 26px; line-height: 1; }
+    .link-preview-copy { min-width: 0; flex: 1; }
+    .link-preview-title { font-weight: 800; font-size: 13.5px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .link-preview-desc { color: var(--text-muted); font-size: 12px; line-height: 1.35; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .link-preview-host { color: var(--text-dim); font-size: 11px; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .link-preview-card:hover { border-color: var(--accent); }
+
+
+    /* ── Glass UI (appearance mode; toggled in Edit Profile) ─────────── */
+    body.ptr29-glass-ui {
+      /* the backdrop now lives in #glass-backdrop (z-index: -1) so a canvas can animate under the UI */
+      background: transparent !important;
+    }
+    /* Dark glass metadata (timestamps, "last seen", hints) was --text-dim
+       (#7a8594) on an almost-black frosted panel — too faint. Lift both muted
+       tiers inside dark glass only; light glass keeps its own darker values. */
+    body.ptr29-glass-ui {
+      --text-dim: #9aa7b8;
+      --text-muted: #c7d0dd;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui {
+      --text-dim: #5b6b81;
+      --text-muted: #3f4c60;
+    }
+    #glass-backdrop {
+      position: fixed; inset: 0; z-index: -1; display: none;
+      pointer-events: none; overflow: hidden; contain: strict;
+    }
+    body.ptr29-glass-ui #glass-backdrop { display: block; }
+    #gb-static,
+    #gb-canvas,
+    #gb-scrim { position: absolute; inset: 0; }
+    #gb-static {
+      background:
+        radial-gradient(circle at 12% 8%, rgba(96,165,250,.22), transparent 30%),
+        radial-gradient(circle at 84% 18%, rgba(168,85,247,.20), transparent 34%),
+        radial-gradient(circle at 50% 105%, rgba(45,212,191,.12), transparent 38%),
+        url('glass-backdrop-dark.jpg') center center / cover no-repeat,
+        #07111f;
+    }
+    #gb-canvas { width: 100%; height: 100%; display: block; opacity: 0; transition: opacity .55s ease; }
+    #gb-canvas.on { opacity: 1; }
+    #gb-scrim { background: linear-gradient(180deg, rgba(5,12,24, var(--gb-scrim-a, .18)), rgba(5,12,24, var(--gb-scrim-b, .34))); }
+    body.ptr29-glass-ui header,
+    body.ptr29-glass-ui #sidebar,
+    body.ptr29-glass-ui #chat,
+    body.ptr29-glass-ui #online-panel,
+    body.ptr29-glass-ui #room-bar,
+    body.ptr29-glass-ui #input-area,
+    body.ptr29-glass-ui .modal,
+    body.ptr29-glass-ui .help-modal-inner,
+    body.ptr29-glass-ui .ag-card,
+    body.ptr29-glass-ui .context-menu,
+    body.ptr29-glass-ui .online-menu,
+    body.ptr29-glass-ui .inbox-popup {
+      background: rgba(15, 23, 42, var(--gb-panel, .42)) !important;
+      border-color: rgba(148, 163, 184, .34) !important;
+      box-shadow: 0 18px 54px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.08) !important;
+      backdrop-filter: blur(var(--gb-blur, 18px)) saturate(1.18);
+      -webkit-backdrop-filter: blur(var(--gb-blur, 18px)) saturate(1.18);
+    }
+    body.ptr29-glass-ui #messages {
+      background: linear-gradient(180deg, rgba(9,16,30, var(--gb-msgs-a, .24)), rgba(9,16,30, var(--gb-msgs-b, .12)));
+    }
+    body.ptr29-glass-ui .msg,
+    body.ptr29-glass-ui .room,
+    body.ptr29-glass-ui input,
+    body.ptr29-glass-ui select,
+    body.ptr29-glass-ui textarea,
+    body.ptr29-glass-ui button.secondary,
+    body.ptr29-glass-ui .file-attachment,
+    body.ptr29-glass-ui .reaction-pill,
+    body.ptr29-glass-ui .link-preview-card {
+      background: rgba(255,255,255, var(--gb-item, .075)) !important;
+      border-color: rgba(203,213,225,.34) !important;
+      box-shadow: 0 10px 30px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.08) !important;
+      backdrop-filter: blur(var(--gb-blur-sm, 14px)) saturate(1.15);
+      -webkit-backdrop-filter: blur(var(--gb-blur-sm, 14px)) saturate(1.15);
+    }
+    body.ptr29-glass-ui .msg.me {
+      background: linear-gradient(135deg, rgba(37,99,235,.52), rgba(124,58,237,.34)) !important;
+      border-color: rgba(147,197,253,.30) !important;
+    }
+    body.ptr29-glass-ui #text,
+    body.ptr29-glass-ui #username,
+    body.ptr29-glass-ui #people-search,
+    body.ptr29-glass-ui #search-messages-input {
+      color: var(--text) !important;
+      -webkit-text-fill-color: var(--text) !important;
+    }
+    body.ptr29-glass-ui .mobile-nav-btn.active,
+    body.ptr29-glass-ui .pt-btn.active,
+    body.ptr29-glass-ui .room.active {
+      background: linear-gradient(135deg, rgba(37,99,235,.62), rgba(124,58,237,.42)) !important;
+      color: #fff !important;
+    }
+    .ui-choice {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel2);
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .ui-choice input[type="checkbox"] { margin-top: 2px; flex: 0 0 auto; }
+    .ui-choice-body { display: block; line-height: 1.45; }
+    .ui-choice-body b { display: block; }
+    .ui-choice-body small { display: block; color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+    .ui-choice.muted { opacity: .6; }
+    body.ptr29-glass-ui .ui-choice,
+    html.ptr29-light-theme body.ptr29-glass-ui .ui-choice {
+      background: rgba(255,255,255, var(--gb-item, .16)) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .ui-choice {
+      background: rgba(255,255,255,.55) !important;
+    }
+
+
+
+    /* Glass mode: inner strips were left opaque (light mode looked flat/white) */
+    body.ptr29-glass-ui #rooms-header,
+    body.ptr29-glass-ui #online-header,
+    body.ptr29-glass-ui #room-bar,
+    body.ptr29-glass-ui #chat-form {
+      background: rgba(15,23,42, var(--gb-strip, .34)) !important;
+      border-color: rgba(148,163,184,.34) !important;
+      box-shadow: none !important;
+      backdrop-filter: blur(var(--gb-blur-sm, 14px)) saturate(1.25) !important;
+      -webkit-backdrop-filter: blur(var(--gb-blur-sm, 14px)) saturate(1.25) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui #rooms-header,
+    html.ptr29-light-theme body.ptr29-glass-ui #online-header,
+    html.ptr29-light-theme body.ptr29-glass-ui #room-bar,
+    html.ptr29-light-theme body.ptr29-glass-ui #chat-form {
+      background: rgba(255,255,255, var(--gb-strip, .36)) !important;
+      border-color: rgba(148,163,184,.34) !important;
+      box-shadow: none !important;
+      backdrop-filter: blur(var(--gb-blur-sm, 14px)) saturate(1.35) !important;
+      -webkit-backdrop-filter: blur(var(--gb-blur-sm, 14px)) saturate(1.35) !important;
+    }
+
+    /* Glass mode: panels inside the layout (sidebar footer, chat banner, settings)
+       were still hard-coded opaque, so they ignored the glass level. */
+    /* These sat ON TOP of an already-frosted parent, so giving them a frost of
+       their own just stacked more haze. Let the parent's glass show instead. */
+    body.ptr29-glass-ui #join-by-passkey,
+    body.ptr29-glass-ui #user-section,
+    body.ptr29-glass-ui #room-info-banner {
+      background: transparent !important;
+      border-color: rgba(148,163,184,.34) !important;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+    body.ptr29-glass-ui #room-settings-panel,
+    body.ptr29-glass-ui .chip,
+    body.ptr29-glass-ui #user-avatar-preview {
+      background: rgba(255,255,255, var(--gb-item, .075)) !important;
+      border-color: rgba(148,163,184,.34) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui #join-by-passkey,
+    html.ptr29-light-theme body.ptr29-glass-ui #user-section,
+    html.ptr29-light-theme body.ptr29-glass-ui #room-info-banner {
+      background: transparent !important;
+      border-color: rgba(148,163,184,.32) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui #room-settings-panel,
+    html.ptr29-light-theme body.ptr29-glass-ui .chip,
+    html.ptr29-light-theme body.ptr29-glass-ui #user-avatar-preview {
+      background: rgba(255,255,255, var(--gb-item, .52)) !important;
+      border-color: rgba(148,163,184,.32) !important;
+    }
+    /* the light theme pinned the passkey box to solid white */
+    html.ptr29-light-theme body.ptr29-glass-ui #passkey-join-input {
+      background: rgba(255,255,255, var(--gb-item, .52)) !important;
+      border-color: rgba(148,163,184,.34) !important;
+      color: #0b1526 !important;
+      -webkit-text-fill-color: #0b1526 !important;
+    }
+
+    /* ── Light mode surface correction: normal + glass ───────────────── */
+    html.ptr29-light-theme #messages {
+      background:
+        radial-gradient(circle at 20% 0%, rgba(37,99,235,.045), transparent 34%),
+        radial-gradient(circle at 80% 100%, rgba(124,58,237,.04), transparent 36%),
+        #f8fafc !important;
+    }
+    html.ptr29-light-theme .msg {
+      background: #ffffff !important;
+      color: var(--text) !important;
+      border-color: #dbe3ec !important;
+      box-shadow: 0 6px 18px rgba(15,23,42,.08) !important;
+    }
+    html.ptr29-light-theme .msg.me {
+      background: linear-gradient(135deg, #dbeafe, #ede9fe) !important;
+      color: #0b1526 !important;
+      border-color: #bfdbfe !important;
+      box-shadow: 0 8px 20px rgba(37,99,235,.12) !important;
+    }
+    html.ptr29-light-theme .msg.image-msg,
+    html.ptr29-light-theme .link-preview-card {
+      background: #ffffff !important;
+      border-color: #d8e2ee !important;
+      box-shadow: 0 8px 22px rgba(15,23,42,.10) !important;
+    }
+    html.ptr29-light-theme .msg.image-msg img.msg-image {
+      border-color: #cbd5e1 !important;
+      background: #f8fafc !important;
+    }
+    html.ptr29-light-theme .meta .time,
+    html.ptr29-light-theme .link-preview-desc,
+    html.ptr29-light-theme .link-preview-host {
+      color: #516278 !important;
+    }
+    html.ptr29-light-theme #input-area {
+      background: #f8fafc !important;
+      border-top-color: #dbe3ec !important;
+      box-shadow: 0 -8px 18px rgba(15,23,42,.06) !important;
+    }
+    html.ptr29-light-theme #chat-form {
+      background: transparent !important;
+      box-shadow: none !important;
+    }
+
+    /* Light + glass mode needs light glass, not the dark glass overlay. */
+    html.ptr29-light-theme body.ptr29-glass-ui {
+      background: transparent !important;
+      color: #0b1526 !important;
+    }
+    html.ptr29-light-theme #gb-static {
+      background:
+        radial-gradient(circle at 12% 8%, rgba(79,157,247,.16), transparent 30%),
+        radial-gradient(circle at 84% 18%, rgba(168,85,247,.14), transparent 34%),
+        radial-gradient(circle at 50% 105%, rgba(45,212,191,.12), transparent 38%),
+        url('glass-backdrop-light.jpg') center center / cover no-repeat,
+        #eef4fb;
+    }
+    html.ptr29-light-theme #gb-scrim {
+      background: linear-gradient(180deg, rgba(255,255,255, var(--gb-scrim-a, .02)), rgba(216,232,250, var(--gb-scrim-b, .10)));
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui header,
+    html.ptr29-light-theme body.ptr29-glass-ui #sidebar,
+    html.ptr29-light-theme body.ptr29-glass-ui #chat,
+    html.ptr29-light-theme body.ptr29-glass-ui #online-panel,
+    html.ptr29-light-theme body.ptr29-glass-ui #room-bar,
+    html.ptr29-light-theme body.ptr29-glass-ui #input-area,
+    html.ptr29-light-theme body.ptr29-glass-ui .modal,
+    html.ptr29-light-theme body.ptr29-glass-ui .help-modal-inner,
+    html.ptr29-light-theme body.ptr29-glass-ui .ag-card,
+    html.ptr29-light-theme body.ptr29-glass-ui .context-menu,
+    html.ptr29-light-theme body.ptr29-glass-ui .online-menu,
+    html.ptr29-light-theme body.ptr29-glass-ui .inbox-popup {
+      background: rgba(255,255,255, var(--gb-panel, .40)) !important;
+      border-color: rgba(148,163,184,.36) !important;
+      box-shadow: 0 18px 42px rgba(15,23,42,.14), inset 0 1px 0 rgba(255,255,255,.72) !important;
+      backdrop-filter: blur(var(--gb-blur, 18px)) saturate(1.5) !important;
+      -webkit-backdrop-filter: blur(var(--gb-blur, 18px)) saturate(1.45) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui #messages {
+      background: linear-gradient(180deg, rgba(255,255,255, var(--gb-msgs-a, .22)), rgba(255,255,255, var(--gb-msgs-b, .10))) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .msg,
+    html.ptr29-light-theme body.ptr29-glass-ui .room,
+    html.ptr29-light-theme body.ptr29-glass-ui input,
+    html.ptr29-light-theme body.ptr29-glass-ui select,
+    html.ptr29-light-theme body.ptr29-glass-ui textarea,
+    html.ptr29-light-theme body.ptr29-glass-ui button.secondary,
+    html.ptr29-light-theme body.ptr29-glass-ui .file-attachment,
+    html.ptr29-light-theme body.ptr29-glass-ui .reaction-pill,
+    html.ptr29-light-theme body.ptr29-glass-ui .link-preview-card {
+      background: rgba(255,255,255, var(--gb-item, .52)) !important;
+      color: #0b1526 !important;
+      border-color: rgba(148,163,184,.34) !important;
+      box-shadow: 0 10px 28px rgba(15,23,42,.12), inset 0 1px 0 rgba(255,255,255,.65) !important;
+      backdrop-filter: blur(var(--gb-blur-sm, 14px)) saturate(1.12) !important;
+      -webkit-backdrop-filter: blur(var(--gb-blur-sm, 14px)) saturate(1.12) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .msg.me {
+      background: linear-gradient(135deg, rgba(96,165,250,.44), rgba(196,181,253,.42)) !important;
+      border-color: rgba(59,130,246,.30) !important;
+      color: #0b1526 !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .mobile-nav-btn.active,
+    html.ptr29-light-theme body.ptr29-glass-ui .pt-btn.active,
+    html.ptr29-light-theme body.ptr29-glass-ui .room.active {
+      background: linear-gradient(135deg, rgba(59,130,246,.76), rgba(124,58,237,.58)) !important;
+      color: #ffffff !important;
+    }
+
+
+
+    /* ── Glass mode: content must stay readable ──────────────────────── */
+    /* The typing strip was hard-coded light grey, so it stayed a solid white
+       band between the room bar and the messages in light glass mode. */
+    body.ptr29-glass-ui #typing {
+      background: transparent !important;
+      border-top: 1px solid rgba(148,163,184,.22) !important;
+      color: var(--accent) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui #typing {
+      background: transparent !important;
+      color: #1d4ed8 !important;
+    }
+    /* Message bubbles are content, not chrome: keep them solid so text never
+       fights the moving waves. Same in both themes. */
+    body.ptr29-glass-ui .msg {
+      background: #111827 !important;
+      border-color: rgba(148,163,184,.28) !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      box-shadow: 0 8px 22px rgba(0,0,0,.34) !important;
+    }
+    body.ptr29-glass-ui .msg.me {
+      background: linear-gradient(135deg, #1d4ed8, #6d28d9) !important;
+      border-color: rgba(147,197,253,.34) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .msg {
+      background: #ffffff !important;
+      border-color: #dbe3ec !important;
+      color: #0b1526 !important;
+      box-shadow: 0 8px 20px rgba(15,23,42,.12) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .msg.me {
+      background: linear-gradient(135deg, #dbeafe, #ede9fe) !important;
+      border-color: #bfdbfe !important;
+      color: #0b1526 !important;
+    }
+    /* text/media inside a solid bubble keeps its contrast */
+    body.ptr29-glass-ui .msg .file-attachment,
+    body.ptr29-glass-ui .msg .link-preview-card {
+      background: rgba(148,163,184,.16) !important;
+      border-color: rgba(148,163,184,.28) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .msg .file-attachment,
+    html.ptr29-light-theme body.ptr29-glass-ui .msg .link-preview-card {
+      background: #f1f5f9 !important;
+      border-color: #dbe3ec !important;
+    }
+
+    /* Glass mode: the dialog scrim is what made every dialog look solid.
+       It was rgba(0,0,0,.7) + blur, i.e. the whole screen behind the dialog got
+       crushed to near-black, so even a 30%-opaque dialog had nothing to show
+       through it. Let the waves through — but keep the age/terms gates dark. */
+    body.ptr29-glass-ui .modal-overlay {
+      background: rgba(4,10,22,.30) !important;
+      backdrop-filter: blur(3px) saturate(1.12) !important;
+      -webkit-backdrop-filter: blur(3px) saturate(1.12) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .modal-overlay {
+      background: rgba(206,224,246,.34) !important;
+      backdrop-filter: blur(3px) saturate(1.06) !important;
+      -webkit-backdrop-filter: blur(3px) saturate(1.06) !important;
+    }
+    /* the gates keep near-opaque backdrops so legal copy stays readable */
+    body.ptr29-glass-ui .ag-overlay {
+      background: rgba(4,8,18,.82) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .ag-overlay {
+      background: rgba(15,23,42,.55) !important;
+    }
+
+    /* ── Glass mode: dialogs and menus stay readable ─────────────────── */
+    /* Popovers are content, not chrome: the fixed glass level must not make
+       them see-through, or labels/inputs vanish into the backdrop. */
+    body.ptr29-glass-ui .modal,
+    body.ptr29-glass-ui .help-modal-inner,
+    body.ptr29-glass-ui .ag-card,
+    body.ptr29-glass-ui .context-menu,
+    body.ptr29-glass-ui .online-menu,
+    /* Dialogs sit at the operator-set 30% opacity level (--gb-dialog-a).
+       The blur is heavier than the panels so text stays legible at that alpha. */
+    body.ptr29-glass-ui .modal,
+    body.ptr29-glass-ui .help-modal-inner,
+    body.ptr29-glass-ui .inbox-popup {
+      background: rgba(11,18,33, var(--gb-dialog-a, .66)) !important;
+      border-color: rgba(148,163,184,.34) !important;
+      color: var(--text) !important;
+      box-shadow: 0 24px 64px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.10) !important;
+      backdrop-filter: blur(22px) saturate(1.30) !important;
+      -webkit-backdrop-filter: blur(22px) saturate(1.30) !important;
+    }
+    /* small pop-up menus keep a little more body behind their text */
+    body.ptr29-glass-ui .context-menu,
+    body.ptr29-glass-ui .online-menu {
+      background: rgba(11,18,33, var(--gb-menu-a, .74)) !important;
+      border-color: rgba(148,163,184,.30) !important;
+      color: var(--text) !important;
+      backdrop-filter: blur(16px) saturate(1.16) !important;
+      -webkit-backdrop-filter: blur(16px) saturate(1.16) !important;
+    }
+    /* age / terms gates carry legal copy — keep them high contrast */
+    body.ptr29-glass-ui .ag-card {
+      background: rgba(11,18,33, var(--gb-gate-a, .92)) !important;
+      border-color: rgba(148,163,184,.30) !important;
+      color: var(--text) !important;
+      backdrop-filter: blur(18px) saturate(1.14) !important;
+      -webkit-backdrop-filter: blur(18px) saturate(1.14) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .modal,
+    html.ptr29-light-theme body.ptr29-glass-ui .help-modal-inner,
+    html.ptr29-light-theme body.ptr29-glass-ui .ag-card,
+    html.ptr29-light-theme body.ptr29-glass-ui .context-menu,
+    html.ptr29-light-theme body.ptr29-glass-ui .online-menu,
+    html.ptr29-light-theme body.ptr29-glass-ui .modal,
+    html.ptr29-light-theme body.ptr29-glass-ui .help-modal-inner,
+    html.ptr29-light-theme body.ptr29-glass-ui .inbox-popup {
+      background: rgba(255,255,255, var(--gb-dialog-a, .30)) !important;
+      border-color: rgba(148,163,184,.40) !important;
+      color: #0b1526 !important;
+      box-shadow: 0 24px 60px rgba(15,23,42,.20), inset 0 1px 0 rgba(255,255,255,.55) !important;
+      backdrop-filter: blur(22px) saturate(1.32) !important;
+      -webkit-backdrop-filter: blur(22px) saturate(1.32) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .context-menu,
+    html.ptr29-light-theme body.ptr29-glass-ui .online-menu {
+      background: rgba(255,255,255, var(--gb-menu-a, .74)) !important;
+      border-color: rgba(148,163,184,.34) !important;
+      color: #0b1526 !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .ag-card {
+      background: rgba(255,255,255, var(--gb-gate-a, .92)) !important;
+      border-color: rgba(148,163,184,.40) !important;
+      color: #0b1526 !important;
+    }
+    /* fields and buttons inside a dialog need real contrast */
+    body.ptr29-glass-ui .modal h3,
+    body.ptr29-glass-ui .modal label,
+    body.ptr29-glass-ui .help-modal-inner h3,
+    body.ptr29-glass-ui .ag-card h3 {
+      color: var(--text) !important;
+    }
+    body.ptr29-glass-ui .modal label,
+    body.ptr29-glass-ui .modal .hint,
+    body.ptr29-glass-ui .modal small {
+      color: var(--text-muted) !important;
+    }
+    body.ptr29-glass-ui .modal input,
+    body.ptr29-glass-ui .modal select,
+    body.ptr29-glass-ui .modal textarea,
+    body.ptr29-glass-ui .modal button.secondary,
+    body.ptr29-glass-ui .context-menu button,
+    body.ptr29-glass-ui .online-menu button {
+      background: rgba(255,255,255,.14) !important;
+      border-color: rgba(203,213,225,.42) !important;
+      color: var(--text) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .modal input,
+    html.ptr29-light-theme body.ptr29-glass-ui .modal select,
+    html.ptr29-light-theme body.ptr29-glass-ui .modal textarea,
+    html.ptr29-light-theme body.ptr29-glass-ui .modal button.secondary,
+    html.ptr29-light-theme body.ptr29-glass-ui .context-menu button,
+    html.ptr29-light-theme body.ptr29-glass-ui .online-menu button {
+      background: #f1f5f9 !important;
+      border-color: #dbe3ec !important;
+      color: #0b1526 !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .modal h3,
+    html.ptr29-light-theme body.ptr29-glass-ui .modal label,
+    html.ptr29-light-theme body.ptr29-glass-ui .help-modal-inner h3 {
+      color: #0b1526 !important;
+    }
+    /* paragraphs inside dialogs (e.g. Contact the operator) */
+    body.ptr29-glass-ui .modal p,
+    body.ptr29-glass-ui .help-modal-inner p,
+    body.ptr29-glass-ui .inbox-popup-body {
+      color: var(--text-muted) !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .modal p,
+    html.ptr29-light-theme body.ptr29-glass-ui .help-modal-inner p,
+    html.ptr29-light-theme body.ptr29-glass-ui .inbox-popup-body {
+      color: #3f4c60 !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui .modal label,
+    html.ptr29-light-theme body.ptr29-glass-ui .modal .hint {
+      color: #3f4c60 !important;
+    }
+    /* placeholder text was near-invisible against the frosted inputs */
+    body.ptr29-glass-ui input::placeholder,
+    body.ptr29-glass-ui textarea::placeholder {
+      color: var(--text-muted) !important;
+      opacity: 1 !important;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui input::placeholder,
+    html.ptr29-light-theme body.ptr29-glass-ui textarea::placeholder {
+      color: #5b6b81 !important;
+      opacity: 1 !important;
+    }
+    /* checkboxes: keep them visible (theme accent), never transparent */
+    body.ptr29-glass-ui input[type="checkbox"] {
+      accent-color: var(--accent) !important;
+      background: rgba(255,255,255,.92) !important;
+      border: 1px solid rgba(148,163,184,.55) !important;
+      border-radius: 4px;
+      width: 16px;
+      height: 16px;
+      appearance: auto;
+      -webkit-appearance: auto;
+      padding: 0;
+      flex: 0 0 auto;
+    }
+    html.ptr29-light-theme body.ptr29-glass-ui input[type="checkbox"] {
+      background: #ffffff !important;
+      border-color: #c3cedb !important;
+    }
+    body.ptr29-glass-ui .modal .modal-actions button.secondary,
+    html.ptr29-light-theme body.ptr29-glass-ui .modal .modal-actions button.secondary {
+      font-weight: 500;
+    }
+    /* ── Light theme surface consistency (normal + glass) ────────────── */
+    html { background-color: #0b1220; }
+    html.ptr29-light-theme { background-color: #eef4fb; }
+
+    html.ptr29-light-theme header {
+      background: linear-gradient(180deg, #ffffff, #f4f7fb) !important;
+      border-bottom: 1px solid var(--border) !important;
+      box-shadow: 0 6px 18px rgba(15,23,42,.06) !important;
+    }
+    html.ptr29-light-theme #rooms-header,
+    html.ptr29-light-theme #online-header,
+    html.ptr29-light-theme #room-bar {
+      background: #f8fafc !important;
+      border-color: var(--border) !important;
+    }
+    html.ptr29-light-theme #room-info-banner {
+      background: #f4f7fb !important;
+      border-bottom: 1px solid var(--border) !important;
+    }
+    html.ptr29-light-theme #sidebar,
+    html.ptr29-light-theme #online-panel {
+      background: #ffffff !important;
+      border-color: var(--border) !important;
+    }
+    html.ptr29-light-theme #chat,
+    html.ptr29-light-theme #messages {
+      background: #f8fafc !important;
+    }
+    html.ptr29-light-theme #input-area {
+      background: #ffffff !important;
+      border-top: 1px solid var(--border) !important;
+      box-shadow: 0 -6px 16px rgba(15,23,42,.05) !important;
+    }
+    html.ptr29-light-theme #typing {
+      background: #f8fafc !important;
+      color: #516278 !important;
+    }
+    html.ptr29-light-theme .sys { color: #1d4ed8 !important; }
+    html.ptr29-light-theme #typing { color: #1d4ed8 !important; }
+    html.ptr29-light-theme .room {
+      background: #f8fafc !important;
+      border-color: #e2e8f0 !important;
+      color: var(--text) !important;
+      box-shadow: none !important;
+    }
+    html.ptr29-light-theme .room:hover { background: #eef4fb !important; }
+    html.ptr29-light-theme .room.active {
+      background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
+      border-color: #2563eb !important;
+      color: #ffffff !important;
+    }
+    html.ptr29-light-theme .online-item { background: transparent !important; }
+    html.ptr29-light-theme .online-item:hover { background: #f1f5f9 !important; }
+    html.ptr29-light-theme .pt-btn {
+      background: #ffffff !important;
+      border-color: #d7e0eb !important;
+      color: #46586f !important;
+    }
+    html.ptr29-light-theme .pt-btn.active {
+      background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
+      border-color: #2563eb !important;
+      color: #ffffff !important;
+    }
+    html.ptr29-light-theme .context-menu,
+    html.ptr29-light-theme .online-menu {
+      background: #ffffff !important;
+      border-color: #d7e0eb !important;
+      box-shadow: 0 16px 34px rgba(15,23,42,.16) !important;
+    }
+    html.ptr29-light-theme .context-menu button,
+    html.ptr29-light-theme .online-menu button { color: var(--text) !important; }
+    html.ptr29-light-theme .context-menu button:hover,
+    html.ptr29-light-theme .online-menu button:hover { background: #f1f5f9 !important; }
+    html.ptr29-light-theme #reply-preview-bar { background: #e8f0fe !important; }
+    html.ptr29-light-theme .msg-actions {
+      background: #ffffff !important;
+      border-color: #d7e0eb !important;
+      box-shadow: 0 8px 20px rgba(15,23,42,.14) !important;
+    }
+    html.ptr29-light-theme .receipts { color: #46586f !important; }
+    html.ptr29-light-theme #people-search,
+    html.ptr29-light-theme #search-messages-input,
+    html.ptr29-light-theme #passkey-join-input { background: #ffffff !important; }
+    html.ptr29-light-theme .mobile-nav-btn { color: #46586f !important; }
+    html.ptr29-light-theme .mobile-nav-btn.active { color: #1d4ed8 !important; }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       OCTOBER HALLOWEEN THEME  ·  active only during October 2026
+       Added/removed by halloween.js. Every rule is scoped to
+       .ptr29-halloween, so outside the season the site is untouched.
+       The backdrop itself is a live 3D-projected canvas in halloween.js.
+       ═══════════════════════════════════════════════════════════════════════ */
+    html.ptr29-halloween {
+      color-scheme: dark !important;
+      background: #06030d !important;
+      --bg: #06030d !important;
+      --panel: #0d0619 !important;
+      --panel2: #150a26 !important;
+      --border: rgba(168, 85, 247, .28) !important;
+      --border-light: rgba(255, 138, 44, .40) !important;
+      --accent: #ff7518 !important;
+      --accent-hover: #ff9a3d !important;
+      --accent2: #a855f7 !important;
+      --text: #f4ecff !important;
+      --text-muted: #cbb9e4 !important;
+      --text-dim: #9d86bb !important;
+      --danger: #ef4444 !important;
+      --danger-hover: #dc2626 !important;
+      --success: #4ade80 !important;
+      --warning: #fbbf24 !important;
+      --composer-bg: #0a0416 !important;
+      --composer-surface: #150a26 !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween {
+      background: transparent !important;
+      color: var(--text) !important;
+    }
+
+    /* ── LIGHT "daytime Halloween" palette ───────────────────────────────
+       The dark palette above is scoped to html.ptr29-halloween only, so it
+       used to win inside light mode too. Because the light theme's own
+       !important rules for #sidebar / #input-area / .room still applied,
+       the two produced a patchwork: white panels carrying dark-theme text.
+       Re-pointing the same variables here (and overriding the handful of
+       literals below) gives light mode its own readable autumn palette. */
+    html.ptr29-light-theme.ptr29-halloween {
+      color-scheme: light !important;
+      background: #fbf3e6 !important;
+      --bg: #fbf3e6 !important;
+      --panel: #fffaf1 !important;
+      --panel2: #fdf1dd !important;
+      --border: rgba(154, 82, 12, .28) !important;
+      --border-light: rgba(194, 104, 16, .40) !important;
+      --accent: #c2410c !important;
+      --accent-hover: #9a3412 !important;
+      --accent2: #7c3aed !important;
+      --text: #2c1608 !important;
+      --text-muted: #6b4423 !important;
+      --text-dim: #8a6a4a !important;
+      --danger: #b91c1c !important;
+      --danger-hover: #991b1b !important;
+      --success: #15803d !important;
+      --warning: #a16207 !important;
+      --composer-bg: #fffaf1 !important;
+      --composer-surface: #fdf1dd !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween {
+      color: var(--text) !important;
+    }
+    /* The night sky is wrong in daylight: swap in a warm autumn haze. */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #glass-backdrop {
+      background:
+        radial-gradient(120% 90% at 68% 12%, #ffe8c9 0%, #fbe0c0 44%, #f6cfae 100%) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween #gb-scrim {
+      background:
+        radial-gradient(120% 92% at 50% 34%, rgba(255, 246, 232, 0) 42%, rgba(120, 62, 12, .16) 100%),
+        linear-gradient(180deg, rgba(255, 250, 240, .10), rgba(140, 74, 18, .10)) !important;
+    }
+    /* Readable surfaces: cream glass instead of the dark violet glass. */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween header,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #sidebar,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #online-panel,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #room-bar,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #input-area,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #rooms-header,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #online-header,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #chat-form,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #room-settings-panel,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #mobile-nav,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .modal,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .help-modal-inner,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .context-menu,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .online-menu,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .inbox-popup,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .ag-card {
+      background: linear-gradient(158deg, rgba(255, 250, 241, .93), rgba(253, 240, 219, .90)) !important;
+      border-color: rgba(154, 82, 12, .24) !important;
+      box-shadow: 0 18px 44px rgba(120, 62, 12, .14), inset 0 1px 0 rgba(255, 255, 255, .70) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #chat {
+      background:
+        radial-gradient(1000px 60% at 92% 0%, rgba(255, 145, 40, .10), transparent 62%),
+        radial-gradient(900px 55% at 4% 100%, rgba(168, 85, 247, .07), transparent 64%),
+        linear-gradient(160deg, rgba(255, 250, 240, .55), rgba(252, 236, 214, .68)) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #messages {
+      background: linear-gradient(180deg, rgba(255, 248, 238, .10), rgba(250, 232, 208, .30)) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #room-info-banner {
+      background: rgba(255, 244, 228, .80) !important;
+      border-color: rgba(154, 82, 12, .22) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #mobile-nav {
+      border-top: 1px solid rgba(194, 104, 16, .26) !important;
+      box-shadow: 0 -10px 26px rgba(120, 62, 12, .12) !important;
+    }
+    /* Message bubbles on cream, with enough contrast for the dark ink. */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg {
+      background: linear-gradient(155deg, rgba(255, 252, 245, .96), rgba(253, 241, 223, .95)) !important;
+      border-color: rgba(154, 82, 12, .22) !important;
+      color: var(--text) !important;
+      box-shadow: 0 8px 20px rgba(120, 62, 12, .10), inset 0 1px 0 rgba(255, 255, 255, .80) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg.me {
+      background: linear-gradient(135deg, rgba(255, 176, 92, .40), rgba(214, 168, 255, .38)) !important;
+      border-color: rgba(194, 104, 16, .42) !important;
+      box-shadow: 0 8px 22px rgba(194, 104, 16, .14), inset 0 1px 0 rgba(255, 255, 255, .60) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg.reply { border-left: 3px solid #c2410c !important; }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg.image-msg,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .link-preview-card {
+      background: linear-gradient(155deg, rgba(255, 251, 243, .96), rgba(252, 238, 218, .95)) !important;
+      border-color: rgba(154, 82, 12, .22) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg img.msg-image {
+      border-color: rgba(194, 104, 16, .30) !important;
+      background: #fdf6ec !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .receipts { color: #6b4423 !important; }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg.me .receipts { color: #5a3413 !important; }
+    /* Rooms, chips, menus */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .room,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .file-attachment,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .reaction-pill,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg-actions,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .ui-choice,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .chip,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #user-avatar-preview {
+      background: rgba(255, 250, 242, .88) !important;
+      border-color: rgba(154, 82, 12, .20) !important;
+      color: var(--text) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .70) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .room:hover,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .online-item:hover {
+      background: rgba(255, 150, 50, .16) !important;
+      border-color: rgba(194, 104, 16, .34) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .online-menu button:hover {
+      background: rgba(255, 150, 50, .16) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .room.active {
+      background: linear-gradient(135deg, #ea6a12, #b4470e) !important;
+      border-color: rgba(180, 71, 14, .70) !important;
+      color: #fff !important;
+      box-shadow: 0 4px 14px rgba(194, 104, 16, .26) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .room.active .room-name,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .room.active .room-meta { color: #fff !important; }
+    /* Inputs */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween input,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween select,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween textarea,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #text,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #username,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #avatar,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #mobile-username,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #people-search,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #search-messages-input,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #mobile-search-input,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #passkey-join-input {
+      background: rgba(255, 253, 248, .96) !important;
+      border-color: rgba(154, 82, 12, .26) !important;
+      color: var(--text) !important;
+      -webkit-text-fill-color: var(--text) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .80) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween input::placeholder,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween textarea::placeholder { color: #8a6a4a !important; }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween input:focus,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween select:focus,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween textarea:focus {
+      border-color: rgba(194, 104, 16, .60) !important;
+      box-shadow: 0 0 0 2px rgba(194, 104, 16, .16) !important;
+    }
+    /* Buttons */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween button.secondary,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #emoji-btn,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #file-btn,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #image-btn {
+      background: rgba(255, 250, 242, .92) !important;
+      border: 1px solid rgba(154, 82, 12, .26) !important;
+      color: #3d1f0a !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween button.secondary:hover,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #emoji-btn:hover,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #file-btn:hover,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #image-btn:hover {
+      background: rgba(255, 236, 214, .96) !important;
+      border-color: rgba(194, 104, 16, .46) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #send-btn {
+      background: linear-gradient(135deg, #ea6a12, #c2410c) !important;
+      color: #fff !important;
+      box-shadow: 0 4px 14px rgba(194, 104, 16, .28), inset 0 1px 0 rgba(255, 255, 255, .40) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #send-btn:hover {
+      background: linear-gradient(135deg, #f5791f, #d94c0c) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #reply-preview-bar {
+      background: rgba(255, 150, 50, .16) !important;
+    }
+    /* Accents: orange on cream needs to be much darker than orange on black. */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .mention,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg.me .mention {
+      color: #9a3412 !important;
+      background: rgba(234, 106, 18, .16) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .mention.mention-me {
+      color: #7c2d12 !important;
+      background: rgba(234, 106, 18, .26) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg-content a.safe-link,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg.me .msg-content a.safe-link {
+      color: #9a3412 !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg-content a.safe-link:hover {
+      color: #7c2d12 !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .sys,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #typing { color: #6b4423 !important; }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .banner-view-btn {
+      color: #9a3412 !important;
+      border-color: rgba(194, 104, 16, .45) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .banner-view-btn:hover {
+      background: #c2410c !important;
+      color: #fff !important;
+      border-color: #c2410c !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween mark.search-hit {
+      background: rgba(255, 150, 50, .40) !important;
+      color: #2c1608 !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween mark.search-hit.active {
+      background: #ea6a12 !important;
+      color: #fff !important;
+    }
+    /* Scrims stay dark enough to separate the dialog from the page. */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .modal-overlay {
+      background: rgba(60, 28, 4, .42) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .ag-overlay {
+      background: radial-gradient(90% 80% at 50% 38%, rgba(255, 240, 220, .34), rgba(70, 34, 6, .56)) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .toast {
+      background: rgba(255, 250, 241, .97) !important;
+      border-color: rgba(154, 82, 12, .30) !important;
+      color: var(--text) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween .brand-name { text-shadow: 0 0 16px rgba(194, 104, 16, .22); }
+    html.ptr29-light-theme.ptr29-halloween .bn-accent { color: #c2410c !important; }
+    html.ptr29-light-theme.ptr29-halloween .brand svg { filter: drop-shadow(0 0 8px rgba(194, 104, 16, .35)); }
+    html.ptr29-light-theme.ptr29-halloween #halloween-btn {
+      box-shadow: 0 0 14px rgba(194, 104, 16, .28);
+    }
+    html.ptr29-light-theme.ptr29-halloween ::-webkit-scrollbar-track { background: rgba(247, 231, 210, .80); }
+    html.ptr29-light-theme.ptr29-halloween ::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #e0812f, #a855f7);
+    }
+    /* The "daylight" notice card + update prompt */
+    html.ptr29-light-theme.ptr29-halloween #hw-notice .hw-notice-card {
+      background:
+        radial-gradient(120% 90% at 50% -10%, rgba(255, 145, 40, .16), transparent 60%),
+        linear-gradient(158deg, rgba(255, 251, 244, .98), rgba(253, 240, 219, .98)) !important;
+      border: 1px solid rgba(194, 104, 16, .38) !important;
+      box-shadow: 0 22px 60px rgba(120, 62, 12, .26), 0 0 0 1px rgba(168, 85, 247, .12) inset !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween #hw-notice h3 { color: #9a3412 !important; text-shadow: none; }
+    html.ptr29-light-theme.ptr29-halloween #hw-notice p { color: #4a2a10 !important; }
+    html.ptr29-light-theme.ptr29-halloween #hw-notice .hw-notice-list li {
+      background: rgba(255, 150, 50, .12) !important;
+      border-color: rgba(194, 104, 16, .26) !important;
+      color: #3d1f0a !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween #hw-notice .hw-notice-list strong { color: #9a3412 !important; }
+    html.ptr29-light-theme.ptr29-halloween #hw-notice .hw-notice-foot { color: #6b4423 !important; }
+    html.ptr29-light-theme.ptr29-halloween #hw-notice .hw-notice-actions button {
+      background: linear-gradient(180deg, #ea6a12, #b4470e) !important; color: #fff !important;
+    }
+
+    /* ── the seasonal canvas replaces the glass waves ───────────────────── */
+    html.ptr29-halloween body.ptr29-halloween #glass-backdrop {
+      display: block !important;
+      background:
+        radial-gradient(120% 90% at 68% 12%, #26083c 0%, #0c0418 46%, #04020a 100%) !important;
+    }
+    html.ptr29-halloween #gb-static,
+    html.ptr29-halloween #gb-canvas { display: none !important; }
+    html.ptr29-halloween #gb-scrim {
+      background:
+        radial-gradient(120% 92% at 50% 34%, rgba(4, 1, 10, 0) 38%, rgba(3, 0, 8, .60) 100%),
+        linear-gradient(180deg, rgba(4, 1, 10, .10), rgba(4, 1, 10, .34)) !important;
+    }
+    #halloween-backdrop {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity .8s ease;
+    }
+    #halloween-backdrop.on { opacity: 1; }
+    #hw-canvas { width: 100%; height: 100%; display: block; }
+
+    /* ── translucent haunted-glass surfaces ─────────────────────────────── */
+    html.ptr29-halloween body.ptr29-halloween header,
+    html.ptr29-halloween body.ptr29-halloween #sidebar,
+    html.ptr29-halloween body.ptr29-halloween #online-panel,
+    html.ptr29-halloween body.ptr29-halloween #room-bar,
+    html.ptr29-halloween body.ptr29-halloween #input-area,
+    html.ptr29-halloween body.ptr29-halloween #rooms-header,
+    html.ptr29-halloween body.ptr29-halloween #online-header,
+    html.ptr29-halloween body.ptr29-halloween #chat-form,
+    html.ptr29-halloween body.ptr29-halloween #room-settings-panel,
+    html.ptr29-halloween body.ptr29-halloween #mobile-nav,
+    html.ptr29-halloween body.ptr29-halloween .modal,
+    html.ptr29-halloween body.ptr29-halloween .help-modal-inner,
+    html.ptr29-halloween body.ptr29-halloween .context-menu,
+    html.ptr29-halloween body.ptr29-halloween .online-menu,
+    html.ptr29-halloween body.ptr29-halloween .inbox-popup,
+    html.ptr29-halloween body.ptr29-halloween .ag-card {
+      background: linear-gradient(158deg, rgba(33, 13, 56, .80), rgba(10, 4, 20, .72)) !important;
+      border-color: rgba(168, 85, 247, .26) !important;
+      box-shadow: 0 22px 60px rgba(0, 0, 0, .48), inset 0 1px 0 rgba(255, 178, 88, .10) !important;
+      backdrop-filter: blur(12px) saturate(1.25);
+      -webkit-backdrop-filter: blur(12px) saturate(1.25);
+    }
+    html.ptr29-halloween body.ptr29-halloween #chat {
+      background:
+        radial-gradient(1000px 60% at 92% 0%, rgba(255, 117, 24, .055), transparent 62%),
+        radial-gradient(900px 55% at 4% 100%, rgba(168, 85, 247, .06), transparent 64%),
+        linear-gradient(160deg, rgba(24, 8, 44, .42), rgba(6, 2, 14, .60)) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween #messages {
+      background: linear-gradient(180deg, rgba(5, 2, 12, .06), rgba(5, 2, 12, .36)) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween #room-info-banner {
+      background: rgba(24, 9, 42, .58) !important;
+      border-color: rgba(168, 85, 247, .22) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween #mobile-nav {
+      border-top: 1px solid rgba(255, 138, 44, .28) !important;
+      box-shadow: 0 -12px 30px rgba(0, 0, 0, .45) !important;
+    }
+
+    /* ── message bubbles ────────────────────────────────────────────────── */
+    html.ptr29-halloween body.ptr29-halloween .msg {
+      background: linear-gradient(155deg, rgba(38, 16, 64, .80), rgba(15, 6, 28, .86)) !important;
+      border-color: rgba(168, 85, 247, .26) !important;
+      color: var(--text) !important;
+      box-shadow: 0 10px 26px rgba(0, 0, 0, .38), inset 0 1px 0 rgba(255, 255, 255, .055) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween .msg.me {
+      background: linear-gradient(135deg, rgba(255, 117, 24, .34), rgba(168, 85, 247, .32)) !important;
+      border-color: rgba(255, 148, 52, .50) !important;
+      box-shadow: 0 10px 30px rgba(255, 90, 0, .16), inset 0 1px 0 rgba(255, 220, 180, .18) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween .msg.reply { border-left: 3px solid #ff7518 !important; }
+    html.ptr29-halloween body.ptr29-halloween .msg.image-msg,
+    html.ptr29-halloween body.ptr29-halloween .link-preview-card {
+      background: linear-gradient(155deg, rgba(32, 13, 56, .82), rgba(12, 5, 24, .88)) !important;
+      border-color: rgba(168, 85, 247, .26) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween .msg img.msg-image {
+      border-color: rgba(255, 138, 44, .30) !important;
+      background: #0a0415 !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween .receipts { color: #b9a6d4 !important; }
+    html.ptr29-halloween body.ptr29-halloween .msg.me .receipts { color: rgba(255, 245, 232, .82) !important; }
+
+    /* ── rooms, inputs, chips, menus ────────────────────────────────────── */
+    html.ptr29-halloween body.ptr29-halloween .room,
+    html.ptr29-halloween body.ptr29-halloween .file-attachment,
+    html.ptr29-halloween body.ptr29-halloween .reaction-pill,
+    html.ptr29-halloween body.ptr29-halloween .msg-actions,
+    html.ptr29-halloween body.ptr29-halloween .ui-choice,
+    html.ptr29-halloween body.ptr29-halloween .chip,
+    html.ptr29-halloween body.ptr29-halloween #user-avatar-preview {
+      background: rgba(35, 15, 60, .62) !important;
+      border-color: rgba(168, 85, 247, .24) !important;
+      color: var(--text) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween .room:hover {
+      background: rgba(255, 117, 24, .13) !important;
+      border-color: rgba(255, 138, 44, .38) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween .room.active {
+      background: linear-gradient(135deg, #ff7518, #b4470e) !important;
+      border-color: rgba(255, 184, 96, .62) !important;
+      box-shadow: 0 0 22px rgba(255, 117, 24, .32), inset 0 1px 0 rgba(255, 230, 190, .30) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween .reaction-pill.active {
+      background: rgba(255, 117, 24, .22) !important;
+      border-color: #ff8a2b !important;
+      box-shadow: 0 0 0 1px rgba(255, 138, 44, .35) inset !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween .online-item:hover { background: rgba(255, 117, 24, .10) !important; }
+    html.ptr29-halloween body.ptr29-halloween .online-menu button:hover { background: rgba(255, 117, 24, .12) !important; }
+
+    html.ptr29-halloween body.ptr29-halloween input,
+    html.ptr29-halloween body.ptr29-halloween select,
+    html.ptr29-halloween body.ptr29-halloween textarea,
+    html.ptr29-halloween body.ptr29-halloween #text,
+    html.ptr29-halloween body.ptr29-halloween #username,
+    html.ptr29-halloween body.ptr29-halloween #avatar,
+    html.ptr29-halloween body.ptr29-halloween #mobile-username,
+    html.ptr29-halloween body.ptr29-halloween #people-search,
+    html.ptr29-halloween body.ptr29-halloween #search-messages-input,
+    html.ptr29-halloween body.ptr29-halloween #mobile-search-input,
+    html.ptr29-halloween body.ptr29-halloween #passkey-join-input {
+      background: rgba(9, 4, 18, .62) !important;
+      border-color: rgba(168, 85, 247, .30) !important;
+      color: var(--text) !important;
+      -webkit-text-fill-color: var(--text) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween input::placeholder,
+    html.ptr29-halloween body.ptr29-halloween textarea::placeholder { color: #9d86bb !important; }
+    html.ptr29-halloween body.ptr29-halloween input:focus,
+    html.ptr29-halloween body.ptr29-halloween select:focus,
+    html.ptr29-halloween body.ptr29-halloween textarea:focus {
+      border-color: rgba(255, 138, 44, .55) !important;
+      box-shadow: 0 0 0 2px rgba(255, 117, 24, .14) !important;
+    }
+
+    html.ptr29-halloween body.ptr29-halloween button.secondary,
+    html.ptr29-halloween body.ptr29-halloween #emoji-btn,
+    html.ptr29-halloween body.ptr29-halloween #file-btn,
+    html.ptr29-halloween body.ptr29-halloween #image-btn {
+      background: rgba(40, 18, 68, .72) !important;
+      border: 1px solid rgba(168, 85, 247, .30) !important;
+      color: #f5ecff !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween button.secondary:hover,
+    html.ptr29-halloween body.ptr29-halloween #emoji-btn:hover,
+    html.ptr29-halloween body.ptr29-halloween #file-btn:hover,
+    html.ptr29-halloween body.ptr29-halloween #image-btn:hover {
+      background: rgba(74, 30, 116, .84) !important;
+      border-color: rgba(255, 138, 44, .50) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween #send-btn {
+      /* Was #ff8a2b→#e8590c: white on the light end only reached 2.35:1, so
+         the label washed out on dark. Darkened both stops to clear 4.5:1. */
+      background: linear-gradient(135deg, #c2410c, #9a3412) !important;
+      color: #fff !important;
+      box-shadow: 0 0 22px rgba(255, 117, 24, .35), inset 0 1px 0 rgba(255, 230, 200, .45) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween #send-btn:hover {
+      background: linear-gradient(135deg, #e8590c, #b4470e) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween #reply-preview-bar { background: rgba(255, 117, 24, .12) !important; }
+
+    /* ── accents, links, search hits ────────────────────────────────────── */
+    html.ptr29-halloween body.ptr29-halloween .mention,
+    html.ptr29-halloween body.ptr29-halloween .msg.me .mention {
+      color: #ffb066 !important;
+      background: rgba(255, 117, 24, .14) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween .mention.mention-me {
+      color: #ffe0a8 !important;
+      background: rgba(255, 138, 44, .28) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween .msg-content a.safe-link,
+    html.ptr29-halloween body.ptr29-halloween .msg.me .msg-content a.safe-link {
+      color: #ffb066 !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween .msg-content a.safe-link:hover { color: #ffd0a0 !important; }
+    html.ptr29-halloween body.ptr29-halloween .sys,
+    html.ptr29-halloween body.ptr29-halloween #typing { color: #d3b8ef !important; }
+    html.ptr29-halloween body.ptr29-halloween .banner-view-btn {
+      color: #ffb066 !important;
+      border-color: rgba(255, 138, 44, .45) !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween .banner-view-btn:hover {
+      background: #ff7518 !important;
+      color: #1a0826 !important;
+      border-color: #ff7518 !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween mark.search-hit {
+      background: rgba(255, 138, 44, .38) !important;
+      color: #fff4e6 !important;
+    }
+    html.ptr29-halloween body.ptr29-halloween mark.search-hit.active {
+      background: #ff8a2b !important;
+      color: #1a0826 !important;
+    }
+
+    /* ── modal scrim + toasts ───────────────────────────────────────────── */
+    html.ptr29-halloween body.ptr29-halloween .modal-overlay {
+      background: rgba(3, 0, 8, .74) !important;
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+    }
+    html.ptr29-halloween body.ptr29-halloween .ag-overlay {
+      background: radial-gradient(90% 80% at 50% 38%, rgba(8, 2, 16, .42), rgba(3, 0, 8, .80)) !important;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    html.ptr29-halloween body.ptr29-halloween .toast {
+      background: rgba(33, 13, 56, .92) !important;
+      border-color: rgba(168, 85, 247, .35) !important;
+      color: var(--text) !important;
+    }
+
+    /* ── a little 3D movement in the chrome ─────────────────────────────── */
+    html.ptr29-halloween .brand svg {
+      filter: drop-shadow(0 0 10px rgba(255, 117, 24, .55));
+      animation: hw-float 6s ease-in-out infinite;
+    }
+    html.ptr29-halloween .brand-name { text-shadow: 0 0 20px rgba(255, 117, 24, .35); }
+    html.ptr29-halloween .bn-accent { color: #ff9a3d !important; }
+    html.ptr29-halloween #halloween-btn {
+      box-shadow: 0 0 18px rgba(255, 117, 24, .35);
+      animation: hw-bob 3.2s ease-in-out infinite;
+      transform-style: preserve-3d;
+    }
+    @keyframes hw-float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50%      { transform: translateY(-2px) rotate(-2deg); }
+    }
+    @keyframes hw-bob {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50%      { transform: translateY(-2px) scale(1.05); }
+    }
+    html.ptr29-halloween ::-webkit-scrollbar { width: 10px; height: 10px; }
+    html.ptr29-halloween ::-webkit-scrollbar-track { background: rgba(9, 3, 18, .65); }
+    html.ptr29-halloween ::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #ff7518, #7c3aed);
+      border-radius: 6px;
+    }
+
+    /* ── one-time Halloween update notice ───────────────────────────────── */
+    #hw-notice .hw-notice-card {
+      position: relative;
+      max-width: 520px;
+      padding: 26px 26px 20px;
+      text-align: center;
+      /* Must stay scrollable: on short screens the content exceeds the card, and
+         mobile.css relies on .modal { overflow-y:auto } to reveal the CTA. An
+         `overflow:hidden` here would clip the primary button unreachably. */
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      max-height: 88vh;
+      max-height: 88dvh;
+      background:
+        radial-gradient(120% 90% at 50% -10%, rgba(255, 117, 24, .16), transparent 60%),
+        linear-gradient(158deg, rgba(33, 13, 56, .97), rgba(10, 4, 20, .98)) !important;
+      border: 1px solid rgba(255, 117, 24, .34) !important;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .7), 0 0 0 1px rgba(168, 85, 247, .18) inset,
+                  0 0 44px rgba(255, 117, 24, .16);
+    }
+    #hw-notice .hw-notice-glow {
+      position: absolute;
+      top: 0; left: 50%;
+      width: 240px; height: 96px;
+      margin-left: -120px;
+      background: radial-gradient(closest-side, rgba(255, 138, 43, .30), transparent);
+      pointer-events: none;
+      animation: hw-notice-pulse 4.5s ease-in-out infinite;
+    }
+    #hw-notice .hw-notice-emoji {
+      font-size: 46px;
+      line-height: 1;
+      margin: 2px 0 10px;
+      filter: drop-shadow(0 0 16px rgba(255, 117, 24, .55));
+      animation: hw-bob 3.2s ease-in-out infinite;
+    }
+    #hw-notice h3 {
+      margin: 0 0 10px !important;
+      font-size: 22px !important;
+      color: #ffd7a8 !important;
+      text-shadow: 0 0 24px rgba(255, 117, 24, .4);
+    }
+    #hw-notice p {
+      margin: 0 0 14px;
+      color: rgba(240, 226, 255, .88) !important;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    #hw-notice .hw-notice-list {
+      margin: 0 0 18px;
+      padding: 0;
+      list-style: none;
+      text-align: left;
+      display: grid;
+      gap: 9px;
+    }
+    #hw-notice .hw-notice-list li {
+      display: flex;
+      gap: 9px;
+      align-items: flex-start;
+      padding: 9px 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: rgba(235, 220, 255, .92);
+      background: rgba(124, 58, 237, .14);
+      border: 1px solid rgba(168, 85, 247, .22);
+      border-radius: 9px;
+    }
+    #hw-notice .hw-notice-list strong { color: #ffb066; font-weight: 600; }
+    #hw-notice .hw-notice-actions { display: flex; justify-content: center; }
+    #hw-notice .hw-notice-actions button {
+      width: 100%;
+      padding: 12px 18px;
+      font-size: 15px;
+      font-weight: 600;
+      border: 0;
+      border-radius: 10px;
+      cursor: pointer;
+      color: #240b02;
+      background: linear-gradient(180deg, #ffa14a, #ff7518);
+      box-shadow: 0 8px 24px rgba(255, 117, 24, .32);
+      transition: transform .14s ease, box-shadow .14s ease, filter .14s ease;
+    }
+    #hw-notice .hw-notice-actions button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.06);
+      box-shadow: 0 11px 28px rgba(255, 117, 24, .42);
+    }
+    #hw-notice .hw-notice-actions button:active { transform: translateY(0); }
+    #hw-notice .hw-notice-foot {
+      margin: 14px 0 0 !important;
+      font-size: 12.5px !important;
+      color: rgba(214, 190, 240, .78) !important;
+    }
+    #hw-notice .help-close {
+      position: absolute;
+      top: 10px; right: 12px;
+      z-index: 2;
+    }
+    @keyframes hw-notice-pulse {
+      0%, 100% { opacity: .55; transform: scale(1); }
+      50%      { opacity: .95; transform: scale(1.08); }
+    }
+    @media (max-width: 540px) {
+      #hw-notice .hw-notice-card { padding: 22px 16px 16px; }
+      #hw-notice .hw-notice-emoji { font-size: 40px; }
+      #hw-notice h3 { font-size: 19px !important; }
+      #hw-notice .hw-notice-list li { padding: 8px 10px; font-size: 12.5px; }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       DECEMBER CHRISTMAS THEME  ·  active only during December
+       Added/removed by christmas.js. Every rule is scoped to
+       .ptr29-christmas, so outside the season the site is untouched.
+       The backdrop itself is a live 3D-projected canvas in christmas.js.
+       ═══════════════════════════════════════════════════════════════════════ */
+    html.ptr29-christmas {
+      color-scheme: dark !important;
+      background: #050b1c !important;
+      --bg: #050b1c !important;
+      --panel: #0a1430 !important;
+      --panel2: #101d40 !important;
+      --border: rgba(120, 180, 255, .26) !important;
+      --border-light: rgba(255, 96, 96, .38) !important;
+      --accent: #e5352f !important;
+      --accent-hover: #ff5a4d !important;
+      --accent2: #3fb96b !important;
+      --text: #eef5ff !important;
+      --text-muted: #b9cbe8 !important;
+      --text-dim: #8ba3c8 !important;
+      --danger: #ef4444 !important;
+      --danger-hover: #dc2626 !important;
+      --success: #4ade80 !important;
+      --warning: #fbbf24 !important;
+      --composer-bg: #08122a !important;
+      --composer-surface: #101d40 !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas {
+      background: transparent !important;
+      color: var(--text) !important;
+    }
+
+    /* ── LIGHT "snowy daylight" palette ──────────────────────────────────
+       Mirrors the Halloween approach: the dark palette above is scoped to
+       html.ptr29-christmas only, so it would win inside light mode too and
+       clash with the light theme's own !important panel rules. Re-pointing
+       the variables here gives light mode its own readable winter palette. */
+    html.ptr29-light-theme.ptr29-christmas {
+      color-scheme: light !important;
+      background: #eef4fb !important;
+      --bg: #eef4fb !important;
+      --panel: #ffffff !important;
+      --panel2: #e9f1fa !important;
+      --border: rgba(24, 78, 140, .22) !important;
+      --border-light: rgba(190, 30, 40, .34) !important;
+      --accent: #b91c25 !important;
+      --accent-hover: #93151c !important;
+      --accent2: #1d7a44 !important;
+      --text: #10233d !important;
+      --text-muted: #44618a !important;
+      --text-dim: #6b83a6 !important;
+      --danger: #b91c1c !important;
+      --danger-hover: #991b1b !important;
+      --success: #15803d !important;
+      --warning: #a16207 !important;
+      --composer-bg: #ffffff !important;
+      --composer-surface: #e9f1fa !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas {
+      color: var(--text) !important;
+    }
+    /* The night sky is wrong in daylight: swap in a bright snowy haze. */
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #glass-backdrop {
+      background:
+        radial-gradient(120% 90% at 68% 12%, #eaf3ff 0%, #dbe9fb 44%, #c6dcf5 100%) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas #gb-scrim {
+      background:
+        radial-gradient(120% 92% at 50% 34%, rgba(244, 250, 255, 0) 42%, rgba(30, 70, 130, .14) 100%),
+        linear-gradient(180deg, rgba(248, 252, 255, .10), rgba(40, 80, 140, .10)) !important;
+    }
+    /* Readable surfaces: frosted white instead of the dark blue glass. */
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas header,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #sidebar,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #online-panel,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #room-bar,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #input-area,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #rooms-header,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #online-header,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #chat-form,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #room-settings-panel,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #mobile-nav,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .modal,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .help-modal-inner,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .context-menu,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .online-menu,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .inbox-popup,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .ag-card {
+      background: linear-gradient(158deg, rgba(255, 255, 255, .88), rgba(232, 242, 252, .84)) !important;
+      border-color: rgba(24, 78, 140, .18) !important;
+      box-shadow: 0 18px 44px rgba(30, 70, 130, .14), inset 0 1px 0 rgba(255, 255, 255, .70) !important;
+      backdrop-filter: blur(12px) saturate(1.15);
+      -webkit-backdrop-filter: blur(12px) saturate(1.15);
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #chat {
+      background:
+        radial-gradient(1000px 60% at 92% 0%, rgba(229, 53, 47, .05), transparent 62%),
+        radial-gradient(900px 55% at 4% 100%, rgba(29, 122, 68, .05), transparent 64%),
+        linear-gradient(160deg, rgba(255, 255, 255, .34), rgba(226, 238, 250, .44)) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #messages {
+      background: linear-gradient(180deg, rgba(255, 255, 255, .10), rgba(210, 228, 246, .30)) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #room-info-banner {
+      background: rgba(255, 255, 255, .72) !important;
+      border-color: rgba(24, 78, 140, .18) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #mobile-nav {
+      border-top: 1px solid rgba(190, 30, 40, .24) !important;
+      box-shadow: 0 -12px 30px rgba(30, 70, 130, .16) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .msg {
+      background: linear-gradient(155deg, rgba(255, 255, 255, .96), rgba(236, 244, 252, .96)) !important;
+      border-color: rgba(24, 78, 140, .18) !important;
+      color: var(--text) !important;
+      box-shadow: 0 10px 24px rgba(30, 70, 130, .12), inset 0 1px 0 rgba(255, 255, 255, .80) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .msg.me {
+      background: linear-gradient(135deg, rgba(229, 53, 47, .20), rgba(63, 185, 107, .20)) !important;
+      border-color: rgba(190, 30, 40, .36) !important;
+      box-shadow: 0 10px 26px rgba(190, 30, 40, .14), inset 0 1px 0 rgba(255, 255, 255, .60) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .msg.reply { border-left: 3px solid #b91c25 !important; }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .msg.image-msg,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .link-preview-card {
+      background: linear-gradient(155deg, rgba(255, 255, 255, .96), rgba(232, 242, 252, .96)) !important;
+      border-color: rgba(24, 78, 140, .18) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .msg img.msg-image {
+      border-color: rgba(190, 30, 40, .24) !important;
+      background: #f3f8fd !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .receipts { color: #44618a !important; }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .msg.me .receipts { color: #33496b !important; }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .room,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .file-attachment,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .reaction-pill,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .msg-actions,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .ui-choice,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .chip,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #user-avatar-preview {
+      background: rgba(255, 255, 255, .82) !important;
+      border-color: rgba(24, 78, 140, .18) !important;
+      color: var(--text) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .70) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .room:hover,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .online-item:hover {
+      background: rgba(229, 53, 47, .08) !important;
+      border-color: rgba(190, 30, 40, .30) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .online-menu button:hover { background: rgba(229, 53, 47, .10) !important; }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .room.active {
+      background: linear-gradient(135deg, #c8202a, #8f1620) !important;
+      border-color: rgba(229, 53, 47, .55) !important;
+      box-shadow: 0 0 20px rgba(190, 30, 40, .30), inset 0 1px 0 rgba(255, 220, 220, .30) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .room.active .room-name,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .room.active .room-meta { color: #fff !important; }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas input,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas select,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas textarea,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #text,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #username,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #avatar,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #mobile-username,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #people-search,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #search-messages-input,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #mobile-search-input,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #passkey-join-input {
+      background: rgba(255, 255, 255, .96) !important;
+      border-color: rgba(24, 78, 140, .22) !important;
+      color: var(--text) !important;
+      -webkit-text-fill-color: var(--text) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .80) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas input::placeholder,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas textarea::placeholder { color: #6b83a6 !important; }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas input:focus,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas select:focus,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas textarea:focus {
+      border-color: rgba(190, 30, 40, .55) !important;
+      box-shadow: 0 0 0 2px rgba(190, 30, 40, .14) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas button.secondary,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #emoji-btn,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #file-btn,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #image-btn {
+      background: rgba(255, 255, 255, .92) !important;
+      border: 1px solid rgba(24, 78, 140, .22) !important;
+      color: #10233d !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas button.secondary:hover,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #emoji-btn:hover,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #file-btn:hover,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #image-btn:hover {
+      background: rgba(232, 242, 252, .98) !important;
+      border-color: rgba(190, 30, 40, .40) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #send-btn {
+      background: linear-gradient(135deg, #c8202a, #8f1620) !important;
+      color: #fff !important;
+      box-shadow: 0 4px 14px rgba(190, 30, 40, .26), inset 0 1px 0 rgba(255, 210, 210, .40) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #send-btn:hover {
+      background: linear-gradient(135deg, #dd2b34, #a81a24) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #reply-preview-bar {
+      background: rgba(229, 53, 47, .14) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .mention,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .msg.me .mention {
+      color: #93151c !important;
+      background: rgba(229, 53, 47, .14) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .mention.mention-me {
+      color: #6f0d13 !important;
+      background: rgba(229, 53, 47, .24) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .msg-content a.safe-link,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .msg.me .msg-content a.safe-link {
+      color: #93151c !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .msg-content a.safe-link:hover {
+      color: #6f0d13 !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .sys,
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas #typing { color: #44618a !important; }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .banner-view-btn {
+      color: #93151c !important;
+      border-color: rgba(190, 30, 40, .40) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .banner-view-btn:hover {
+      background: #b91c25 !important;
+      color: #fff !important;
+      border-color: #b91c25 !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas mark.search-hit {
+      background: rgba(229, 53, 47, .30) !important;
+      color: #10233d !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas mark.search-hit.active {
+      background: #c8202a !important;
+      color: #fff !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .modal-overlay {
+      background: rgba(16, 35, 61, .42) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .ag-overlay {
+      background: radial-gradient(90% 80% at 50% 38%, rgba(240, 248, 255, .34), rgba(16, 35, 61, .56)) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas body.ptr29-christmas .toast {
+      background: rgba(255, 255, 255, .97) !important;
+      border-color: rgba(24, 78, 140, .26) !important;
+      color: var(--text) !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas .brand-name { text-shadow: 0 0 16px rgba(190, 30, 40, .20); }
+    html.ptr29-light-theme.ptr29-christmas .bn-accent { color: #b91c25 !important; }
+    html.ptr29-light-theme.ptr29-christmas .brand svg { filter: drop-shadow(0 0 8px rgba(190, 30, 40, .32)); }
+    html.ptr29-light-theme.ptr29-christmas #christmas-btn {
+      box-shadow: 0 0 14px rgba(190, 30, 40, .26);
+    }
+    html.ptr29-light-theme.ptr29-christmas ::-webkit-scrollbar-track { background: rgba(224, 236, 248, .80); }
+    html.ptr29-light-theme.ptr29-christmas ::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #e5352f, #3fb96b);
+    }
+    /* The "snowy daylight" notice card */
+    html.ptr29-light-theme.ptr29-christmas #xmas-notice .xmas-notice-card {
+      background:
+        radial-gradient(120% 90% at 50% -10%, rgba(229, 53, 47, .14), transparent 60%),
+        linear-gradient(158deg, rgba(255, 255, 255, .98), rgba(233, 243, 253, .98)) !important;
+      border: 1px solid rgba(190, 30, 40, .32) !important;
+      box-shadow: 0 22px 60px rgba(30, 70, 130, .24), 0 0 0 1px rgba(63, 185, 107, .10) inset !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas #xmas-notice h3 { color: #93151c !important; text-shadow: none; }
+    html.ptr29-light-theme.ptr29-christmas #xmas-notice p { color: #24405f !important; }
+    html.ptr29-light-theme.ptr29-christmas #xmas-notice .xmas-notice-list li {
+      background: rgba(229, 53, 47, .10) !important;
+      border-color: rgba(190, 30, 40, .22) !important;
+      color: #10233d !important;
+    }
+    html.ptr29-light-theme.ptr29-christmas #xmas-notice .xmas-notice-list strong { color: #93151c !important; }
+    html.ptr29-light-theme.ptr29-christmas #xmas-notice .xmas-notice-foot { color: #44618a !important; }
+    html.ptr29-light-theme.ptr29-christmas #xmas-notice .xmas-notice-actions button {
+      background: linear-gradient(180deg, #dd2b34, #8f1620) !important; color: #fff !important;
+    }
+
+    /* ── the seasonal canvas replaces the glass waves ───────────────────── */
+    html.ptr29-christmas body.ptr29-christmas #glass-backdrop {
+      display: block !important;
+      background:
+        radial-gradient(120% 90% at 62% 14%, #10294f 0%, #071531 46%, #03081a 100%) !important;
+    }
+    html.ptr29-christmas #gb-static,
+    html.ptr29-christmas #gb-canvas { display: none !important; }
+    html.ptr29-christmas #gb-scrim {
+      background:
+        radial-gradient(120% 92% at 50% 34%, rgba(4, 10, 24, 0) 38%, rgba(2, 6, 16, .58) 100%),
+        linear-gradient(180deg, rgba(4, 10, 24, .10), rgba(4, 10, 24, .32)) !important;
+    }
+    #christmas-backdrop {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity .8s ease;
+    }
+    #christmas-backdrop.on { opacity: 1; }
+    #xmas-canvas { width: 100%; height: 100%; display: block; }
+
+    /* ── translucent frosted-glass surfaces ─────────────────────────────── */
+    html.ptr29-christmas body.ptr29-christmas header,
+    html.ptr29-christmas body.ptr29-christmas #sidebar,
+    html.ptr29-christmas body.ptr29-christmas #online-panel,
+    html.ptr29-christmas body.ptr29-christmas #room-bar,
+    html.ptr29-christmas body.ptr29-christmas #input-area,
+    html.ptr29-christmas body.ptr29-christmas #rooms-header,
+    html.ptr29-christmas body.ptr29-christmas #online-header,
+    html.ptr29-christmas body.ptr29-christmas #chat-form,
+    html.ptr29-christmas body.ptr29-christmas #room-settings-panel,
+    html.ptr29-christmas body.ptr29-christmas #mobile-nav,
+    html.ptr29-christmas body.ptr29-christmas .modal,
+    html.ptr29-christmas body.ptr29-christmas .help-modal-inner,
+    html.ptr29-christmas body.ptr29-christmas .context-menu,
+    html.ptr29-christmas body.ptr29-christmas .online-menu,
+    html.ptr29-christmas body.ptr29-christmas .inbox-popup,
+    html.ptr29-christmas body.ptr29-christmas .ag-card {
+      background: linear-gradient(158deg, rgba(18, 34, 66, .80), rgba(6, 12, 28, .72)) !important;
+      border-color: rgba(120, 180, 255, .24) !important;
+      box-shadow: 0 22px 60px rgba(0, 0, 0, .48), inset 0 1px 0 rgba(150, 200, 255, .10) !important;
+      backdrop-filter: blur(12px) saturate(1.25);
+      -webkit-backdrop-filter: blur(12px) saturate(1.25);
+    }
+    html.ptr29-christmas body.ptr29-christmas #chat {
+      background:
+        radial-gradient(1000px 60% at 92% 0%, rgba(229, 53, 47, .055), transparent 62%),
+        radial-gradient(900px 55% at 4% 100%, rgba(63, 185, 107, .06), transparent 64%),
+        linear-gradient(160deg, rgba(12, 26, 54, .42), rgba(3, 7, 18, .60)) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas #messages {
+      background: linear-gradient(180deg, rgba(4, 10, 24, .06), rgba(4, 10, 24, .36)) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas #room-info-banner {
+      background: rgba(14, 28, 56, .58) !important;
+      border-color: rgba(120, 180, 255, .20) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas #mobile-nav {
+      border-top: 1px solid rgba(255, 96, 96, .26) !important;
+      box-shadow: 0 -12px 30px rgba(0, 0, 0, .45) !important;
+    }
+
+    /* ── message bubbles ────────────────────────────────────────────────── */
+    html.ptr29-christmas body.ptr29-christmas .msg {
+      background: linear-gradient(155deg, rgba(20, 38, 74, .80), rgba(8, 16, 36, .86)) !important;
+      border-color: rgba(120, 180, 255, .24) !important;
+      color: var(--text) !important;
+      box-shadow: 0 10px 26px rgba(0, 0, 0, .38), inset 0 1px 0 rgba(255, 255, 255, .055) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas .msg.me {
+      background: linear-gradient(135deg, rgba(229, 53, 47, .34), rgba(63, 185, 107, .30)) !important;
+      border-color: rgba(255, 120, 110, .48) !important;
+      box-shadow: 0 10px 30px rgba(190, 30, 40, .16), inset 0 1px 0 rgba(255, 220, 220, .18) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas .msg.reply { border-left: 3px solid #e5352f !important; }
+    html.ptr29-christmas body.ptr29-christmas .msg.image-msg,
+    html.ptr29-christmas body.ptr29-christmas .link-preview-card {
+      background: linear-gradient(155deg, rgba(18, 34, 66, .82), rgba(6, 12, 28, .88)) !important;
+      border-color: rgba(120, 180, 255, .24) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas .msg img.msg-image {
+      border-color: rgba(255, 96, 96, .28) !important;
+      background: #050b1c !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas .receipts { color: #a8bede !important; }
+    html.ptr29-christmas body.ptr29-christmas .msg.me .receipts { color: rgba(240, 248, 255, .82) !important; }
+
+    /* ── rooms, inputs, chips, menus ────────────────────────────────────── */
+    html.ptr29-christmas body.ptr29-christmas .room,
+    html.ptr29-christmas body.ptr29-christmas .file-attachment,
+    html.ptr29-christmas body.ptr29-christmas .reaction-pill,
+    html.ptr29-christmas body.ptr29-christmas .msg-actions,
+    html.ptr29-christmas body.ptr29-christmas .ui-choice,
+    html.ptr29-christmas body.ptr29-christmas .chip,
+    html.ptr29-christmas body.ptr29-christmas #user-avatar-preview {
+      background: rgba(20, 38, 74, .62) !important;
+      border-color: rgba(120, 180, 255, .22) !important;
+      color: var(--text) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas .room:hover {
+      background: rgba(229, 53, 47, .13) !important;
+      border-color: rgba(255, 96, 96, .36) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas .room.active {
+      background: linear-gradient(135deg, #e5352f, #9c1c22) !important;
+      border-color: rgba(255, 150, 140, .58) !important;
+      box-shadow: 0 0 22px rgba(229, 53, 47, .32), inset 0 1px 0 rgba(255, 220, 210, .30) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas .reaction-pill.active {
+      background: rgba(229, 53, 47, .22) !important;
+      border-color: #ff6a5a !important;
+      box-shadow: 0 0 0 1px rgba(255, 96, 96, .32) inset !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas .online-item:hover { background: rgba(229, 53, 47, .10) !important; }
+    html.ptr29-christmas body.ptr29-christmas .online-menu button:hover { background: rgba(229, 53, 47, .12) !important; }
+
+    html.ptr29-christmas body.ptr29-christmas input,
+    html.ptr29-christmas body.ptr29-christmas select,
+    html.ptr29-christmas body.ptr29-christmas textarea,
+    html.ptr29-christmas body.ptr29-christmas #text,
+    html.ptr29-christmas body.ptr29-christmas #username,
+    html.ptr29-christmas body.ptr29-christmas #avatar,
+    html.ptr29-christmas body.ptr29-christmas #mobile-username,
+    html.ptr29-christmas body.ptr29-christmas #people-search,
+    html.ptr29-christmas body.ptr29-christmas #search-messages-input,
+    html.ptr29-christmas body.ptr29-christmas #mobile-search-input,
+    html.ptr29-christmas body.ptr29-christmas #passkey-join-input {
+      background: rgba(6, 14, 32, .62) !important;
+      border-color: rgba(120, 180, 255, .28) !important;
+      color: var(--text) !important;
+      -webkit-text-fill-color: var(--text) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas input::placeholder,
+    html.ptr29-christmas body.ptr29-christmas textarea::placeholder { color: #8ba3c8 !important; }
+    html.ptr29-christmas body.ptr29-christmas input:focus,
+    html.ptr29-christmas body.ptr29-christmas select:focus,
+    html.ptr29-christmas body.ptr29-christmas textarea:focus {
+      border-color: rgba(255, 96, 96, .55) !important;
+      box-shadow: 0 0 0 2px rgba(229, 53, 47, .14) !important;
+    }
+
+    html.ptr29-christmas body.ptr29-christmas button.secondary,
+    html.ptr29-christmas body.ptr29-christmas #emoji-btn,
+    html.ptr29-christmas body.ptr29-christmas #file-btn,
+    html.ptr29-christmas body.ptr29-christmas #image-btn {
+      background: rgba(20, 38, 74, .72) !important;
+      border: 1px solid rgba(120, 180, 255, .28) !important;
+      color: #eef5ff !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas button.secondary:hover,
+    html.ptr29-christmas body.ptr29-christmas #emoji-btn:hover,
+    html.ptr29-christmas body.ptr29-christmas #file-btn:hover,
+    html.ptr29-christmas body.ptr29-christmas #image-btn:hover {
+      background: rgba(34, 60, 108, .84) !important;
+      border-color: rgba(255, 96, 96, .48) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas #send-btn {
+      /* Kept dark enough that the white label clears 4.5:1 on both stops. */
+      background: linear-gradient(135deg, #c8202a, #8f1620) !important;
+      color: #fff !important;
+      box-shadow: 0 0 22px rgba(229, 53, 47, .32), inset 0 1px 0 rgba(255, 220, 210, .45) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas #send-btn:hover {
+      background: linear-gradient(135deg, #dd2b34, #a81a24) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas #reply-preview-bar { background: rgba(229, 53, 47, .12) !important; }
+
+    /* ── accents, links, search hits ────────────────────────────────────── */
+    html.ptr29-christmas body.ptr29-christmas .mention,
+    html.ptr29-christmas body.ptr29-christmas .msg.me .mention {
+      color: #ff9c92 !important;
+      background: rgba(229, 53, 47, .14) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas .mention.mention-me {
+      color: #ffd6d0 !important;
+      background: rgba(255, 96, 96, .28) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas .msg-content a.safe-link,
+    html.ptr29-christmas body.ptr29-christmas .msg.me .msg-content a.safe-link {
+      color: #ff9c92 !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas .msg-content a.safe-link:hover { color: #ffc4bc !important; }
+    html.ptr29-christmas body.ptr29-christmas .sys,
+    html.ptr29-christmas body.ptr29-christmas #typing { color: #b9cbe8 !important; }
+    html.ptr29-christmas body.ptr29-christmas .banner-view-btn {
+      color: #ff9c92 !important;
+      border-color: rgba(255, 96, 96, .42) !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas .banner-view-btn:hover {
+      background: #e5352f !important;
+      color: #170207 !important;
+      border-color: #e5352f !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas mark.search-hit {
+      background: rgba(255, 96, 96, .36) !important;
+      color: #fff2f0 !important;
+    }
+    html.ptr29-christmas body.ptr29-christmas mark.search-hit.active {
+      background: #ff6a5a !important;
+      color: #170207 !important;
+    }
+
+    /* ── modal scrim + toasts ───────────────────────────────────────────── */
+    html.ptr29-christmas body.ptr29-christmas .modal-overlay {
+      background: rgba(2, 6, 16, .74) !important;
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+    }
+    html.ptr29-christmas body.ptr29-christmas .ag-overlay {
+      background: radial-gradient(90% 80% at 50% 38%, rgba(8, 16, 36, .42), rgba(2, 6, 16, .80)) !important;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    html.ptr29-christmas body.ptr29-christmas .toast {
+      background: rgba(18, 34, 66, .92) !important;
+      border-color: rgba(120, 180, 255, .32) !important;
+      color: var(--text) !important;
+    }
+
+    /* ── a little 3D movement in the chrome ─────────────────────────────── */
+    html.ptr29-christmas .brand svg {
+      filter: drop-shadow(0 0 10px rgba(229, 53, 47, .55));
+      animation: xmas-float 6s ease-in-out infinite;
+    }
+    html.ptr29-christmas .brand-name { text-shadow: 0 0 20px rgba(229, 53, 47, .35); }
+    html.ptr29-christmas .bn-accent { color: #ff5a4d !important; }
+    html.ptr29-christmas #christmas-btn {
+      box-shadow: 0 0 18px rgba(229, 53, 47, .35);
+      animation: xmas-bob 3.2s ease-in-out infinite;
+      transform-style: preserve-3d;
+    }
+    @keyframes xmas-float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50%      { transform: translateY(-2px) rotate(2deg); }
+    }
+    @keyframes xmas-bob {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50%      { transform: translateY(-2px) scale(1.05); }
+    }
+    html.ptr29-christmas ::-webkit-scrollbar { width: 10px; height: 10px; }
+    html.ptr29-christmas ::-webkit-scrollbar-track { background: rgba(4, 10, 24, .65); }
+    html.ptr29-christmas ::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #e5352f, #3fb96b);
+      border-radius: 6px;
+    }
+
+    /* ── one-time Christmas update notice ───────────────────────────────── */
+    #xmas-notice .xmas-notice-card {
+      position: relative;
+      max-width: 520px;
+      padding: 26px 26px 20px;
+      text-align: center;
+      /* Must stay scrollable: on short screens the content exceeds the card, and
+         mobile.css relies on .modal { overflow-y:auto } to reveal the CTA. */
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      max-height: 88vh;
+      max-height: 88dvh;
+      background:
+        radial-gradient(120% 90% at 50% -10%, rgba(229, 53, 47, .16), transparent 60%),
+        linear-gradient(158deg, rgba(18, 34, 66, .97), rgba(6, 12, 28, .98)) !important;
+      border: 1px solid rgba(229, 53, 47, .32) !important;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .7), 0 0 0 1px rgba(120, 180, 255, .16) inset,
+                  0 0 44px rgba(229, 53, 47, .16);
+    }
+    #xmas-notice .xmas-notice-glow {
+      position: absolute;
+      top: 0; left: 50%;
+      width: 240px; height: 96px;
+      margin-left: -120px;
+      background: radial-gradient(closest-side, rgba(255, 90, 80, .28), transparent);
+      pointer-events: none;
+      animation: xmas-notice-pulse 4.5s ease-in-out infinite;
+    }
+    #xmas-notice .xmas-notice-emoji {
+      font-size: 46px;
+      line-height: 1;
+      margin: 2px 0 10px;
+      filter: drop-shadow(0 0 16px rgba(229, 53, 47, .55));
+      animation: xmas-bob 3.2s ease-in-out infinite;
+    }
+    #xmas-notice h3 {
+      margin: 0 0 10px !important;
+      font-size: 22px !important;
+      color: #ffd0c8 !important;
+      text-shadow: 0 0 24px rgba(229, 53, 47, .4);
+    }
+    #xmas-notice p {
+      margin: 0 0 14px;
+      color: rgba(228, 238, 255, .88) !important;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    #xmas-notice .xmas-notice-list {
+      margin: 0 0 18px;
+      padding: 0;
+      list-style: none;
+      text-align: left;
+      display: grid;
+      gap: 9px;
+    }
+    #xmas-notice .xmas-notice-list li {
+      display: flex;
+      gap: 9px;
+      align-items: flex-start;
+      padding: 9px 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: rgba(226, 238, 255, .92);
+      background: rgba(63, 185, 107, .14);
+      border: 1px solid rgba(120, 180, 255, .20);
+      border-radius: 9px;
+    }
+    #xmas-notice .xmas-notice-list strong { color: #ff9c92; font-weight: 600; }
+    #xmas-notice .xmas-notice-actions { display: flex; justify-content: center; }
+    #xmas-notice .xmas-notice-actions button {
+      width: 100%;
+      padding: 12px 18px;
+      font-size: 15px;
+      font-weight: 600;
+      border: 0;
+      border-radius: 10px;
+      cursor: pointer;
+      color: #fff;
+      background: linear-gradient(180deg, #dd2b34, #8f1620);
+      box-shadow: 0 8px 24px rgba(229, 53, 47, .32);
+      transition: transform .14s ease, box-shadow .14s ease, filter .14s ease;
+    }
+    #xmas-notice .xmas-notice-actions button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.06);
+      box-shadow: 0 11px 28px rgba(229, 53, 47, .42);
+    }
+    #xmas-notice .xmas-notice-actions button:active { transform: translateY(0); }
+    #xmas-notice .xmas-notice-foot {
+      margin: 14px 0 0 !important;
+      font-size: 12.5px !important;
+      color: rgba(196, 216, 240, .78) !important;
+    }
+    #xmas-notice .help-close {
+      position: absolute;
+      top: 10px; right: 12px;
+      z-index: 2;
+    }
+    @keyframes xmas-notice-pulse {
+      0%, 100% { opacity: .55; transform: scale(1); }
+      50%      { opacity: .95; transform: scale(1.08); }
+    }
+    @media (max-width: 540px) {
+      #xmas-notice .xmas-notice-card { padding: 22px 16px 16px; }
+      #xmas-notice .xmas-notice-emoji { font-size: 40px; }
+      #xmas-notice h3 { font-size: 19px !important; }
+      #xmas-notice .xmas-notice-list li { padding: 8px 10px; font-size: 12.5px; }
+    }
+
+    /* ── update-available notice ────────────────────────────────────────── */
+    #update-notice .update-notice-card {
+      max-width: 460px;
+      padding: 26px 24px 20px;
+      text-align: center;
+      background: linear-gradient(158deg, var(--panel2), var(--panel)) !important;
+      border: 1px solid var(--border) !important;
+      box-shadow: 0 22px 60px rgba(0, 0, 0, .42);
+    }
+    #update-notice .update-notice-icon {
+      font-size: 42px;
+      line-height: 1;
+      margin-bottom: 10px;
+      animation: up-pop 2.6s ease-in-out infinite;
+    }
+    #update-notice h3 { margin: 0 0 10px !important; font-size: 19px !important; }
+    #update-notice p { margin: 0 0 18px; font-size: 14px; line-height: 1.55; color: var(--text-muted) !important; }
+    #update-notice .update-notice-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    #update-notice .update-notice-actions button { flex: 1; min-width: 130px; padding: 11px 16px; }
+    @keyframes up-pop {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50%      { transform: translateY(-3px) rotate(-3deg); }
+    }
+
+    /* ── report a bug ───────────────────────────────────────────────────── */
+    #bug-report-modal .bug-report-card {
+      max-width: 520px;
+      text-align: left;
+      padding: 24px 24px 18px;
+    }
+    #bug-report-modal h3 { margin: 0 0 8px !important; font-size: 20px !important; }
+    #bug-report-modal .bug-report-lead {
+      margin: 0 0 16px;
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--text-muted);
+    }
+    #bug-report-modal .bug-field {
+      display: block;
+      margin-bottom: 13px;
+    }
+    #bug-report-modal .bug-field > span {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    #bug-report-modal .bug-field > span em {
+      font-style: normal;
+      font-weight: 400;
+      color: var(--text-dim);
+      font-size: 11.5px;
+    }
+    #bug-report-modal .bug-field input,
+    #bug-report-modal .bug-field select,
+    #bug-report-modal .bug-field textarea {
+      width: 100%;
+      box-sizing: border-box;
+      font-family: inherit;
+      font-size: 14px;
+    }
+    #bug-report-modal .bug-field textarea { resize: vertical; min-height: 68px; }
+    #bug-report-modal .bug-details-auto {
+      margin: 4px 0 14px;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    #bug-report-modal .bug-details-auto summary { cursor: pointer; }
+    #bug-report-modal .bug-details-auto pre {
+      margin: 8px 0 0;
+      padding: 10px 12px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 11.5px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      background: rgba(0, 0, 0, .22);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    html.ptr29-light-theme #bug-report-modal .bug-details-auto pre { background: rgba(15, 23, 42, .05); }
+    #bug-report-modal .bug-report-status {
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, .05);
+    }
+    #bug-report-modal .bug-report-status.error {
+      border-color: rgba(239, 68, 68, .45);
+      background: rgba(239, 68, 68, .12);
+    }
+    #bug-report-modal .bug-report-status.success {
+      border-color: rgba(74, 222, 128, .45);
+      background: rgba(74, 222, 128, .12);
+    }
+    #bug-report-modal .bug-report-actions { gap: 10px; flex-wrap: wrap; }
+    #bug-report-modal .bug-report-actions button { flex: 1; min-width: 120px; padding: 11px 16px; }
+    #bug-report-modal .bug-report-foot {
+      margin: 14px 0 0;
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--text-dim);
+    }
+    #bug-report-modal .bug-report-foot a { color: var(--accent); }
+    #bug-report-btn { font-size: 15px; }
+    @media (max-width: 540px) {
+      #bug-report-modal .bug-report-card { padding: 20px 15px 14px; }
+      #bug-report-modal h3 { font-size: 18px !important; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html.ptr29-halloween .brand svg,
+      html.ptr29-halloween #halloween-btn,
+      #hw-notice .hw-notice-emoji,
+      #hw-notice .hw-notice-glow,
+      #update-notice .update-notice-icon { animation: none !important; }
+    }
+
   </style>
 </head>
 <body>
+  <!-- Live glass backdrop: still image first paint, canvas waves on top, theme scrim above -->
+  <div id="glass-backdrop" aria-hidden="true">
+    <div id="gb-static"></div>
+    <canvas id="gb-canvas"></canvas>
+    <div id="gb-scrim"></div>
+  </div>
   <header>
-    <h1>💬 ptr_29 Chat</h1>
+    <div class="brand" title="ptr_29 Chat">
+      <svg viewBox="0 0 48 48" width="27" height="27" aria-hidden="true"><defs><linearGradient id="ptr29g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".55" stop-color="#3b82f6"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs><path d="M24 5C13 5 4 12.8 4 22.4c0 5.4 2.9 10.2 7.5 13.4-.2 2.9-1.4 5.5-3.4 7.5 4.4-.4 8.2-1.8 10.9-3.7 1.6.3 3.3.5 5 .5 11 0 20-7.8 20-17.4S35 5 24 5z" fill="none" stroke="url(#ptr29g)" stroke-width="3.2" stroke-linejoin="round"/><path d="M26.8 13.5 18.6 25h5.6l-2.3 9.5L30.4 22h-5.6l2-8.5z" fill="url(#ptr29g)"/></svg>
+      <span class="brand-name">ptr_29&nbsp;<span class="bn-accent">Chat</span></span>
+    </div>
     <div class="header-actions">
-      <a href="/terms.html" class="secondary" style="text-decoration: none; padding: 10px 18px; font-size: 14px; font-weight: 500; border-radius: 8px; border: 1px solid var(--border); background: var(--border); color: var(--text); transition: all 0.15s ease; white-space: nowrap; display: inline-block;">Terms</a>
-      <a href="/privacy.html" class="secondary" style="text-decoration: none; padding: 10px 18px; font-size: 14px; font-weight: 500; border-radius: 8px; border: 1px solid var(--border); background: var(--border); color: var(--text); transition: all 0.15s ease; white-space: nowrap; display: inline-block;">Privacy</a>
+      <a href="terms.html" class="secondary" style="text-decoration: none; padding: 10px 18px; font-size: 14px; font-weight: 500; border-radius: 8px; border: 1px solid var(--border); background: var(--border); color: var(--text); transition: all 0.15s ease; white-space: nowrap; display: inline-block;">Terms</a>
+      <a href="privacy.html" class="secondary" style="text-decoration: none; padding: 10px 18px; font-size: 14px; font-weight: 500; border-radius: 8px; border: 1px solid var(--border); background: var(--border); color: var(--text); transition: all 0.15s ease; white-space: nowrap; display: inline-block;">Privacy</a>
+      <button id="contact-btn" class="secondary" title="Contact operator" aria-label="Contact operator">☎️</button>
       <button id="help-btn" class="secondary" title="How to use">❓</button>
+      <button id="tour-btn" class="secondary" title="Live guided tour">🎓</button>
+      <button id="inbox-btn" class="secondary" title="Inbox — Client ID requests">📥<span id="inbox-badge" hidden></span></button>
       <button id="theme-toggle" class="secondary" title="Toggle theme">🌙</button>
     </div>
   </header>
@@ -1379,7 +4273,9 @@
         </div>
         <div class="user-actions">
           <button id="edit-profile-btn" class="secondary">Edit Profile</button>
+          <button id="glass-motion-toggle" class="secondary" style="display:none" title="Pause or play the live backdrop">⏸ Still</button>
           <button id="delete-user-btn" class="danger">Delete Account</button>
+          <button id="logout-btn" class="secondary">Logout</button>
         </div>
       </div>
     </aside>
@@ -1392,12 +4288,27 @@
           <span id="room-type-tag" class="room-tag">Public</span>
           <span id="room-role-tag" class="room-tag" style="display:none"></span>
         </div>
-        <div style="display:flex; gap:8px">
+        <div style="display:flex; gap:8px; align-items:center">
           <input type="text" id="search-messages-input" placeholder="Search..." style="padding:4px 8px; font-size:12px; width:120px;" autocomplete="off">
+          <span class="search-count" hidden></span>
+          <button type="button" class="secondary search-nav search-prev" hidden title="Previous match (Shift+Enter)">↑</button>
+          <button type="button" class="secondary search-nav search-next" hidden title="Next match (Enter)">↓</button>
+          <button type="button" class="secondary search-nav search-cancel" hidden title="Cancel search (Esc)">✕</button>
+          <button type="button" id="mobile-search-btn" class="secondary mobile-only" title="Search messages">🔍</button>
+          <button type="button" id="tablet-people-btn" class="secondary" title="People">👥</button>
           <button id="room-settings-btn" class="secondary">⚙️ <span>Settings</span></button>
           <button id="clear-room-btn" class="secondary">🗑️ <span>Clear</span></button>
-          <button id="leave-btn" class="secondary"><span>Leave</span></button>
+          <button id="leave-btn" class="secondary">🚪 <span>Leave</span></button>
         </div>
+      </div>
+
+      <!-- Mobile-only collapsible search bar (shown/hidden by JS only) -->
+      <div id="mobile-search-bar" style="display:none">
+        <input id="mobile-search-input" type="text" placeholder="Search messages…" autocomplete="off">
+        <span class="search-count" hidden></span>
+        <button type="button" class="secondary search-nav search-prev" hidden title="Previous match">↑</button>
+        <button type="button" class="secondary search-nav search-next" hidden title="Next match">↓</button>
+        <button type="button" id="mobile-search-close-btn" class="secondary search-cancel" title="Cancel search">✕</button>
       </div>
       
       <div id="room-settings-panel">
@@ -1416,14 +4327,23 @@
             <input id="add-admin-input" type="text" placeholder="Client ID to make admin" style="flex:1; font-size:0.8rem">
             <button id="add-admin-btn" class="secondary" style="white-space:nowrap">+ Add Admin</button>
           </div>
-          <div class="settings-row" style="align-items:flex-start">
-            <span class="settings-label">Members:</span>
+          <div class="settings-row" style="display:none; align-items:flex-start">
+            <span class="settings-label">Users:</span>
             <div id="room-members-list" style="display:flex; gap:6px; flex-wrap:wrap; flex:1"></div>
+          </div>
+          <div class="settings-section" id="room-bans-section" style="display:none">
+            <h3>Banned from this room</h3>
+            <div id="room-bans-list" style="display:flex; gap:6px; flex-wrap:wrap"></div>
+            <div style="display:flex; gap:6px; align-items:center; margin-top:8px">
+              <input id="room-ban-input" type="text" placeholder="Client ID or username to ban" style="flex:1; font-size:0.8rem">
+              <button id="room-ban-btn" class="secondary" style="white-space:nowrap">⛔ Ban</button>
+            </div>
+            <div style="font-size:11.5px;color:var(--text-dim);margin-top:6px">Banned people cannot rejoin (not even with the passkey). Press ↩ to allow someone back in.</div>
           </div>
           <div class="settings-row" id="add-member-row" style="display:none; align-items:center; gap:6px">
             <span class="settings-label"></span>
-            <input id="add-member-input" type="text" placeholder="Client ID to add as member" style="flex:1; font-size:0.8rem">
-            <button id="add-member-btn" class="secondary" style="white-space:nowrap">+ Add Member</button>
+            <input id="add-member-input" type="text" placeholder="Client ID of the user to add" style="flex:1; font-size:0.8rem">
+            <button id="add-member-btn" class="secondary" style="white-space:nowrap">+ Add User</button>
           </div>
         </div>
         
@@ -1462,6 +4382,9 @@
       </div>
       
       <div id="typing"></div>
+      <button type="button" id="scroll-bottom" title="Jump to the newest messages" aria-label="Jump to the newest messages">
+        ↓<span id="scroll-bottom-badge" hidden></span>
+      </button>
       <div id="messages"></div>
       
       <div id="input-area">
@@ -1479,17 +4402,24 @@
           <button type="button" id="file-btn" class="secondary" title="Send file">📎</button>
           <button type="button" id="image-btn" class="secondary" title="Send image">📷</button>
           <button type="submit" id="send-btn" title="Send message"><span class="send-label">Send</span><span class="send-icon" aria-hidden="true">➤</span></button>
-          <input type="file" id="image-file" accept="image/*" style="display:none">
-          <input type="file" id="general-file" accept="*/*" style="display:none">
+          <input type="file" id="image-file" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none">
+          <input type="file" id="general-file" accept=".pdf,.txt,.text,.log,.csv,.json,.docx,.xlsx,.pptx,image/jpeg,image/png,image/gif,image/webp" style="display:none">
         </form>
       </div>
     </section>
     
     <aside id="online-panel">
       <div id="online-header">
-        <h2>Online Users</h2>
+        <h2>People</h2>
+        <div class="people-toggle">
+          <button type="button" id="show-online-btn" class="pt-btn active">Online</button>
+          <button type="button" id="show-offline-btn" class="pt-btn">Offline</button>
+        </div>
+        <input type="text" id="people-search" placeholder="Search people…" autocomplete="off"
+          style="width:100%;margin-top:8px;padding:6px 10px;font-size:12px;border-radius:6px">
       </div>
       <div id="online-list"></div>
+      <div id="offline-list" hidden></div>
     </aside>
   </main>
 
@@ -1533,17 +4463,18 @@
     </div>
   </div>
   
-  <!-- Delete User Modal -->
+  <!-- Delete Profile Modal -->
   <div id="delete-user-modal" class="modal-overlay">
     <div class="modal">
-      <h3>⚠️ Delete Account</h3>
+      <h3>⚠️ Delete Everything</h3>
       <div class="warning">
-        <strong>Warning:</strong> This action cannot be undone. Your account, all your messages, and your presence in all rooms will be permanently deleted.
+        <strong>Full erase:</strong> this permanently deletes your <b>account</b>, your chat <b>user</b>, every message, reaction and read receipt sent under your name, your presence, and any rooms you own. This cannot be undone.
       </div>
-      <p>Are you sure you want to delete your account?</p>
+      <input id="delete-pass" type="password" placeholder="Enter your account password to confirm" autocomplete="current-password" style="margin:10px 0 0;width:100%">
+      <p>Delete your account and all data?</p>
       <div class="modal-actions">
         <button type="button" id="cancel-delete-user" class="secondary">Cancel</button>
-        <button id="confirm-delete-user" class="danger">Delete Permanently</button>
+        <button id="confirm-delete-user" class="danger">Delete Everything</button>
       </div>
     </div>
   </div>
@@ -1552,10 +4483,10 @@
   <div id="help-modal" class="modal-overlay">
     <div class="help-modal-inner">
       <div class="help-header">
-        <div class="help-logo">💬</div>
+        <div class="help-logo"><svg viewBox="0 0 48 48" width="40" height="40" aria-hidden="true"><defs><linearGradient id="ptr29g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".55" stop-color="#3b82f6"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs><path d="M24 5C13 5 4 12.8 4 22.4c0 5.4 2.9 10.2 7.5 13.4-.2 2.9-1.4 5.5-3.4 7.5 4.4-.4 8.2-1.8 10.9-3.7 1.6.3 3.3.5 5 .5 11 0 20-7.8 20-17.4S35 5 24 5z" fill="none" stroke="url(#ptr29g3)" stroke-width="3.2" stroke-linejoin="round"/><path d="M26.8 13.5 18.6 25h5.6l-2.3 9.5L30.4 22h-5.6l2-8.5z" fill="url(#ptr29g3)"/></svg></div>
         <div>
           <h3 class="help-title">How to Use ptr_29 Chat</h3>
-          <p class="help-sub">A complete guide to all features</p>
+          <p class="help-sub">Production guide — features, privacy, and limits</p>
         </div>
         <button id="help-close-btn" class="help-close">×</button>
       </div>
@@ -1589,12 +4520,15 @@
           </div>
           <div class="help-text">
             <h3>👋 Welcome to ptr_29 Chat</h3>
-            <p>A real-time group chat with public &amp; private rooms, reply threads, image sharing, and full room management — all in your browser.</p>
+            <p>A real-time group chat with public and access-controlled private rooms, replies, reactions, files, images, and room-scoped management.</p>
             <ul class="help-tips">
-              <li>🖊️ <strong>Set your username</strong> in the bottom-left box before joining</li>
-              <li>🏠 <strong>Click any room</strong> in the sidebar to join it instantly</li>
-              <li>✉️ <strong>Type &amp; press Enter</strong> (or Send) to post a message</li>
-              <li>❓ <strong>This guide</strong> walks you through every feature — use arrows or keyboard ← → to navigate</li>
+              <li>🔐 <strong>Log in or create your account</strong> at the start gate — signup requires 13+ confirmation and Terms acceptance; older accounts are prompted for any missing age or Terms verification</li>
+              <li>🏠 <strong>Choose a room</strong> from the sidebar; #general is the shared starting room</li>
+              <li>✉️ <strong>Type and press Enter</strong> (or Send) to post a message</li>
+              <li><span class="show-mobile-only">📱 Use the <strong>Rooms</strong>, <strong>Chat</strong>, and <strong>Online</strong> tabs at the bottom</span><span class="show-tablet-only">👥 Tap the <strong>People button</strong> in the room bar to open the People panel</span><span class="show-desktop-only">👤 The <strong>People panel</strong> on the right shows who is online</span></li>
+              <li>🎓 <strong>Guided tour</strong> launches once after new signup and can be replayed manually; fake volunteers (Nova &amp; Rex) help demonstrate controls; demo rooms auto-delete afterwards</li>
+              <li>🔎 <strong>Search a room</strong> from the room bar (highlighted matches with a counter and ↑/↓ navigation), type <strong>@</strong> to mention someone, and use the floating <strong>↓</strong> button to jump back to the newest message</li>
+              <li>❓ <strong>Navigate this guide</strong> with its buttons or the ← and → keyboard keys</li>
             </ul>
           </div>
         </div>
@@ -1608,22 +4542,23 @@
               <div style="font-family:monospace;font-size:10px;color:var(--accent);margin-bottom:12px;background:var(--bg);padding:5px 8px;border-radius:6px;border:1px solid var(--border)">a1b2c3d4-e5f6-…</div>
               <div style="margin-bottom:6px;font-size:11px;color:var(--text-dim)">Username</div>
               <div class="demo-input flex1" style="margin-bottom:12px;display:block;color:var(--text)">CoolUser99</div>
-              <div style="margin-bottom:6px;font-size:11px;color:var(--text-dim)">Avatar URL <span style="color:var(--text-dim)">(optional)</span></div>
+              <div style="margin-bottom:6px;font-size:11px;color:var(--text-dim)">Avatar <span style="color:var(--text-dim)">(URL or 📷 upload, optional)</span></div>
               <div class="demo-input flex1" style="margin-bottom:14px;display:block;font-size:9px;color:var(--text-dim)">https://…</div>
               <div class="demo-btn-row" style="justify-content:flex-end">
                 <div class="demo-btn sm-btn highlight-btn">Save Changes</div>
               </div>
-              <div class="demo-share-hint">Your ID is permanent — share it so others can add you to private rooms</div>
+              <div class="demo-share-hint">Your account identity is used for private-room membership</div>
             </div>
           </div>
           <div class="help-text">
             <h3>👤 Your Profile</h3>
-            <p>Click <strong>Edit Profile</strong> in the sidebar to set your name and avatar. Your Client ID is unique and permanent — keep it safe.</p>
+            <p>Your <strong>account</strong> (created at the start gate) sets your initial username; <strong>Edit Profile</strong> lets you change it (the old name's content is wiped) and set an optional avatar.</p>
             <ul class="help-tips">
-              <li>✏️ <strong>Username</strong> is checked live — you'll see a ✓ when it's available</li>
-              <li>🖼️ <strong>Avatar URL</strong> — paste any image link, or leave blank for an auto-generated avatar</li>
-              <li>🪪 <strong>Client ID</strong> — share this so room owners can grant you access to private rooms</li>
-              <li>🗑️ <strong>Delete Account</strong> removes your profile and all stored data from the server</li>
+              <li>✏️ <strong>Username</strong> is checked live, must currently be available, and cannot contain “anonymous” anywhere; legacy accounts with that pattern are blocked from use</li>
+              <li>🖼️ <strong>Avatar</strong> — paste a safe HTTPS image URL or tap <strong>📷 Upload picture</strong> (works on phones); leave blank for a DiceBear avatar</li>
+              <li>🪪 <strong>Client ID</strong> follows your account; it stays private unless you explicitly approve sharing it. Changing your username creates a new Client ID and warns before saving</li>
+              <li>🗑️ <strong>Delete Account</strong> asks for your password, then permanently erases the account, the chat user, every message/reaction/receipt under the name, presence, and owned rooms. Renaming still wipes the old name's content.</li>
+              <li>♻️ <strong>Abandoned names</strong> (holder offline, or orphaned rows) can be reclaimed by anyone; active names are protected</li>
             </ul>
           </div>
         </div>
@@ -1653,13 +4588,16 @@
           </div>
           <div class="help-text">
             <h3>🏠 Rooms</h3>
-            <p>All available rooms are listed in the left sidebar. Public rooms are open to everyone. Private rooms require a passkey or invite.</p>
+            <p>Available rooms appear in the left sidebar. Public rooms are open to signed-in accounts. Private rooms require existing membership or a valid passkey.</p>
             <ul class="help-tips">
-              <li>📌 <strong>Click a room</strong> to switch into it — unread count shown in red badge</li>
-              <li>➕ <strong>Create Room</strong> — give it a name and optionally make it private</li>
-              <li>🔒 <strong>Private rooms</strong> — only accessible with a passkey or if the owner adds you</li>
-              <li>🔑 <strong>Join by passkey</strong> — paste the passkey code at the bottom of the sidebar and click Join</li>
-              <li>↻ <strong>Refresh</strong> — manually reload the room list</li>
+              <li>📌 <strong>Click a room</strong> to switch to it; unread messages appear as a badge</li>
+              <li>➕ <strong>Create Room</strong> with a name and optional private-room setting</li>
+              <li>🔒 <strong>Private means access-controlled</strong>, not end-to-end encrypted</li>
+              <li>🔑 <strong>Join by passkey</strong> by entering the code in the sidebar; the browser may save it for reconnecting</li>
+              <li>👥 <strong>Membership persists</strong> for the same account identity after a successful private-room join, and an owner/admin can add you directly (see Room Settings)</li>
+              <li>🚪 <strong>Kicked or banned?</strong> A room owner/admin can remove you; you can rejoin once they press <em>Allow rejoin</em> in that room's settings</li>
+              <li>↻ <strong>Refresh</strong> manually reloads the room list</li>
+              <li>🎓 <strong>The guided tour</strong> creates two temporary rooms (public + private), lets you browse them during the demo — sending still requires a verified account — and deletes them when it ends</li>
             </ul>
           </div>
         </div>
@@ -1693,14 +4631,18 @@
           </div>
           <div class="help-text">
             <h3>💬 Sending Messages</h3>
-            <p>Type your message in the box at the bottom and press <strong>Enter</strong> or click <strong>Send</strong>. Images can be attached with 📷.</p>
+            <p>Type in the bottom box and press <strong>Enter</strong> or <strong>Send</strong>. Messages synchronize through Supabase Realtime.</p>
             <ul class="help-tips">
-              <li>↩️ <strong>Reply</strong> — hover a message and click ↩ to quote it in your reply</li>
-              <li>📋 <strong>Copy</strong> — hover a message and click 📋 to copy its text</li>
-              <li>✏️ <strong>Edit</strong> — you can edit your own messages within 5 minutes of sending</li>
-              <li>🗑️ <strong>Delete</strong> — permanently remove your own messages at any time</li>
-              <li>🖱️ <strong>Right-click</strong> (or long-press on mobile) to open the context menu</li>
-              <li>📷 <strong>Images</strong> — click the camera button to share a photo from your device</li>
+              <li>↩️ <strong>Reply</strong>, 📋 <strong>copy</strong>, 😊 <strong>react</strong>, ✏️ <strong>edit</strong>, or 🗑️ <strong>delete</strong> from the message actions</li>
+              <li>⏱️ <strong>Edit</strong> is shown for your own messages during the first 5 minutes</li>
+              <li>👆 <strong>Tap a message on mobile</strong> or right-click it on desktop to reveal actions</li>
+              <li>📎 <strong>Files</strong> are allow-listed up to 10 MB; 📷 <strong>images</strong> are JPG/PNG/GIF/WebP up to 5 MB</li>
+              <li>🔗 <strong>Links</strong> may be plain or Markdown-style; private/local, credential-hidden, punycode, risky download, spammy, and unsafe-protocol links are blocked before saving. This is not a full malware scan of the destination.</li>
+              <li>@ <strong>Mentions</strong> — type <code>@</code> in the composer for a filtered list of users (online first). The person you mention sees a highlighted <b>@name</b> chip, an in-app toast and a system notification</li>
+              <li>🔎 <strong>Search</strong> (the box in the room bar) highlights every match, shows a live counter like <code>2/6</code> and steps through them with ↑/↓ (Enter / Shift+Enter). <b>✕</b> cancels and restores your view</li>
+              <li>⬇️ <strong>Jump to newest</strong> — a floating ↓ button appears when you scroll up, with a badge counting messages that arrived while you were reading</li>
+              <li>✓ <strong>Read receipts</strong> and typing status are visible to room participants; links and receipts re-tint per theme so they stay readable on both bubble colours</li>
+              <li>⚠️ Deleting a message removes it from chat, but an associated uploaded storage object may remain</li>
             </ul>
           </div>
         </div>
@@ -1731,21 +4673,25 @@
                 <div class="demo-chip">Bob <span class="demo-x">×</span></div>
               </div>
               <div class="demo-settings-row">
-                <span>Members:</span>
+                <span>Users:</span>
                 <div class="demo-chip">Alice <span class="demo-x">×</span></div>
               </div>
             </div>
           </div>
           <div class="help-text">
             <h3>⚙️ Room Settings</h3>
-            <p>Click <strong>⚙️ Settings</strong> in the chat header to manage a room. Only the room owner and admins can make changes.</p>
+            <p>Click <strong>⚙️ Settings</strong> to manage the current room. Owner and admin permissions apply only to that room.</p>
             <ul class="help-tips">
-              <li>✏️ <strong>Rename</strong> — give the room a new name (not available for #general)</li>
-              <li>🔒 <strong>Privacy toggle</strong> — switch between public and private</li>
-              <li>🔑 <strong>Passkey</strong> — generate, copy, or clear the room's passkey. Share it so others can join</li>
-              <li>🛡️ <strong>Admins</strong> — add users by Client ID to help manage the room</li>
-              <li>👥 <strong>Members</strong> — grant specific users permanent access to a private room</li>
-              <li>🗑️ <strong>Delete Room</strong> — permanently removes the room and all messages (owner only)</li>
+              <li>✏️ <strong>Rename</strong> the room (not available for #general)</li>
+              <li>🔒 <strong>Privacy</strong> switches between public and access-controlled private membership</li>
+              <li>🔑 <strong>Passkey</strong> can be generated, copied, saved, or cleared; it is not an encryption key</li>
+              <li>🛡️ <strong>Add Admin / Add User</strong> accept a <strong>Client ID or a username</strong> and are resolved server-side, so private-room access really works. Settings show owner &amp; admin usernames (not raw IDs)</li>
+              <li>👑 <strong>The owner counts as an admin</strong> in the room banner, and is shown with a crown in the admin list</li>
+              <li>🚪 <strong>Kick</strong> — the ⋮ menu in the People panel offers it only for someone who is actually in this room (never for the owner, an admin, or yourself)</li>
+              <li>⛔ <strong>Ban / Allow rejoin</strong> — <em>Room settings → Banned from this room</em> lets you ban someone by Client ID or username and press ↩ to let them back in. A banned person cannot rejoin, even with the passkey</li>
+              <li>🔑 <strong>Old-room rescue</strong> — if a room's owner row belongs to a dead browser session, an admin is offered "claim ownership" so management works again</li>
+              <li>🧹 <strong>Clear</strong> removes the room’s message rows; <strong>Delete Room</strong> is available to the owner or a room admin</li>
+              <li>🚫 <strong>No global moderation:</strong> room admins cannot ban a user platform-wide, terminate an identity, delete another profile, or revoke a username</li>
             </ul>
           </div>
         </div>
@@ -1787,14 +4733,117 @@
           </div>
           <div class="help-text">
             <h3>🟢 Online Users &amp; Info</h3>
-            <p>The right panel shows everyone currently online and which room they're in. The info banner at the top of the chat area shows key room details.</p>
+            <p><span class="show-desktop-only">The right <strong>People</strong> panel shows everyone — Online and Offline — with a toggle, live counts, and a search box.</span><span class="show-tablet-only">Tap the <strong>👥 button</strong> in the room bar to slide open the <strong>People panel</strong> — it shows everyone with Online/Offline toggle, live counts, and search.</span><span class="show-mobile-only">Open the <strong>Online</strong> tab at the bottom to see everyone — Online and Offline — with a toggle, live counts, and a search box.</span></p>
             <ul class="help-tips">
-              <li>👁️ <strong>Online panel</strong> — see all connected users and their current room in real time</li>
-              <li>🔔 <strong>Room info banner</strong> — shows owner, live user count, and admin count at a glance</li>
-              <li>📬 <strong>Unread badges</strong> — red numbers on rooms you haven't read yet</li>
-              <li>💡 <strong>Click "View Info"</strong> in the banner to jump straight to the settings panel</li>
-              <li>⌨️ <strong>Typing indicator</strong> — see when someone else is typing in real time</li>
-              <li>🖼️ <strong>Click any image</strong> in chat to view it full-screen in the lightbox</li>
+              <li>🟢 <strong>Online = tab open</strong> — leaving a room keeps you online; closing the tab makes you offline</li>
+              <li> <strong>Offline list</strong> shows everyone not present, with “seen …” last-seen times</li>
+              <li>🔎 <strong>Search people</strong> filters both lists live as you type</li>
+              <li>🔔 <strong>Room info</strong> shows the owner, live user count, and room-admin count</li>
+              <li>⋮ <strong>Per-person menu</strong> — View profile, Request Client ID, and (for a room manager) <b>Kick</b> when that person is in the current room</li>
+              <li>📬 <strong>Unread badges</strong> mark activity in rooms you are not viewing</li>
+              <li>⌨️ <strong>Typing indicators</strong> are temporary realtime broadcasts</li>
+              <li>🖼️ <strong>Click an image</strong> to view the authorized signed media URL in the lightbox</li>
+              <li>🔔 <strong>System notifications</strong> are sent through the service worker, so they appear <b>outside the app</b> (background tab, minimised window, locked phone) for other-room messages, mentions and inbox requests. Turn them on in <b>Edit Profile → Appearance</b>; they may expose sender, room and a short preview on your screen. On iPhone, add the site to your Home Screen first</li>
+              <li>🎨 <strong>Appearance lives in Edit Profile</strong> — Glass UI (frosted panels over the live animated backdrop) and the backdrop motion switch</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- ── Slide 7: Privacy, data, and limits ── -->
+        <div class="help-slide">
+          <div class="help-demo">
+            <div class="demo-panel">
+              <div class="demo-label">🔐 Privacy &amp; Limits</div>
+              <div class="demo-settings-row">
+                <span>Identity</span>
+                <div class="demo-chip">Browser-specific</div>
+              </div>
+              <div class="demo-settings-row">
+                <span>Private rooms</span>
+                <div class="demo-toggle on-toggle">Access controlled</div>
+              </div>
+              <div class="demo-settings-row">
+                <span>Encryption</span>
+                <div class="demo-chip">HTTPS in transit</div>
+              </div>
+              <div class="demo-settings-row">
+                <span>Global bans</span>
+                <div class="demo-chip">Not available</div>
+              </div>
+              <div class="demo-share-hint" style="margin-top:12px">Do not send passwords, financial data, IDs, medical records, or other secrets.</div>
+            </div>
+          </div>
+          <div class="help-text">
+            <h3>🔐 Privacy, Data &amp; Current Limits</h3>
+            <p>The production site uses GitHub Pages and Supabase with account gates, age/Terms verification, database policies, upload limits, CSP headers, safe-link checks, and Client-ID consent controls. Understand the limits before sharing content.</p>
+            <ul class="help-tips">
+              <li>🆔 <strong>Your identity follows your account</strong> — log in on any device and your content is there; signup and existing-account access require 13+ confirmation plus Terms/Privacy acceptance; passwords are SHA-256-salted on-device, then bcrypt + pepper server-side</li>
+              <li>🌙 <strong>Theme</strong> — switch dark/light with the 🌙/☀️ toolbar button; your choice is remembered</li>
+              <li>🫧 <strong>Glass UI</strong> — optional frosted look with a live animated backdrop, switched on in Edit Profile → Appearance (fixed 15% glass level, motion can be frozen)</li>
+              <li>🫧 <strong>Glass UI (everyone)</strong> — turn it on in <strong>Edit Profile → Appearance</strong> to swap the flat panels for frosted glass floating over a <strong>live backdrop</strong>: flowing colour waves drawn on the spot, with dark and light palettes that follow your theme. It applies immediately and is remembered on this browser</li>
+              <li>⏸ <strong>Motion</strong> — freeze or resume the waves with the ⏸ Still / ▶ Animate button in the sidebar, or the "Live backdrop animation" switch in Edit Profile (handy on battery saver or slow devices). The app also honours your system "reduce motion" setting by starting still</li>
+              <li>🫧 <strong>Glass level</strong> — fixed at the final <strong>15%</strong> for everyone (panels ~15% opaque with a light 6.4px blur, so the live backdrop always shows through). Dialogs sit at 30% and the 13+/Terms gates stay near-solid so their legal copy is always readable; message bubbles are deliberately opaque so text never fights the waves</li>
+              <li>🔒 <strong>Private rooms are not end-to-end encrypted</strong>; authorized participants and infrastructure providers may technically access content</li>
+              <li>🗑️ <strong>Delete Account</strong> (password-verified) erases account + user + every message/reaction/receipt + presence + owned rooms; renames wipe the old name; the operator can purge any username</li>
+              <li>⚪ <strong>Presence &amp; last-seen</strong> are visible to other users while your tab is open and as a “seen …” time after you leave</li>
+              <li>🛡️ <strong>Admin rights are room-scoped</strong>: an owner/admin can add members, kick, or ban <em>inside their own room</em> (and can reverse it). There is no global ban/account-termination control, but the reserved “anonymous” username pattern is blocked</li>
+              <li>🔔 <strong>Notifications</strong> are opt-in (Edit Profile → Appearance) and delivered by the service worker, so they can appear outside the app; they can show sender, room and a short message preview on your lock screen</li>
+              <li>📄 Read the <a href="terms.html" target="_blank" rel="noopener noreferrer">Terms of Use</a> and <a href="privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>; they cover the 13+ rule, uploads, safe links, link-safety limits, Client-ID requests, and account deletion</li>
+              <li>☎️ <strong>Contact</strong> is available from the header: WhatsApp, Instagram, YouTube, and GitHub links are the official operator channels</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-slide">
+          <div class="help-demo">
+            <div class="demo-panel">
+              <div class="demo-label">👤 Member Profiles</div>
+              <div class="demo-profile" style="margin-bottom:12px">
+                <div class="demo-avatar-ring"><span class="demo-avatar">🦊</span></div>
+                <div>
+                  <div class="demo-name">SomeUser</div>
+                  <div class="demo-id">● online in #general</div>
+                </div>
+              </div>
+              <div class="demo-settings-row"><span>Messages / Rooms</span><div class="demo-chip">public stats</div></div>
+              <div class="demo-settings-row"><span>Client ID</span><div class="demo-toggle">hidden by default</div></div>
+              <div class="demo-settings-row"><span>🔑 Request ID</span><div class="demo-chip">reason required</div></div>
+            </div>
+          </div>
+          <div class="help-text">
+            <h3>👤 Profiles &amp; Client-ID Requests</h3>
+            <p>In <strong>Online Users</strong>, tap the <strong>⋮</strong> button next to a person and choose <strong>View profile</strong> or <strong>Request Client ID</strong>. If you manage the current room, a <strong>🚪 Kick</strong> option also appears for people who are actually in that room. Profiles show their avatar, live status and public activity — never their Client ID.</p>
+            <ul class="help-tips">
+              <li>📊 Profiles show <strong>public activity only</strong>: presence, message/room/image/reaction stats, first &amp; last active</li>
+              <li>🪪 <strong>Client IDs are never shown</strong> on profiles — they stay private by default</li>
+              <li>🔑 You may <strong>request someone's Client ID</strong> with a written reason; they see who asked and why</li>
+              <li>✅ Only an <strong>explicit approval</strong> shares the ID (a snapshot at that moment — later changes need a new request)</li>
+              <li>🔒 <strong>Stop sharing</strong> lets the approver revoke an approved Client-ID disclosure so the requester must ask again</li>
+              <li>❌ Denials are final for that request; you may ask again later, but never pressure anyone</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-slide">
+          <div class="help-demo">
+            <div class="demo-panel">
+              <div class="demo-label">📥 Inbox</div>
+              <div class="demo-settings-row"><span>“May I have your ID? It's me, from school.”</span><div class="demo-chip">pending</div></div>
+              <div class="demo-settings-row"><span>Approve</span><div class="demo-toggle on-toggle">shares YOUR id once</div></div>
+              <div class="demo-settings-row"><span>Deny</span><div class="demo-chip">nothing is shared</div></div>
+              <div class="demo-settings-row"><span>Stop sharing</span><div class="demo-chip">revokes access</div></div>
+              <div class="demo-share-hint" style="margin-top:12px">The 📥 badge shows pending requests. Approvals, denials and revocations update live.</div>
+            </div>
+          </div>
+          <div class="help-text">
+            <h3>📥 The Inbox</h3>
+            <p>The 📥 button (top bar) is your inbox for Client-ID requests — both directions.</p>
+            <ul class="help-tips">
+              <li>📨 <strong>Requests for you</strong>: see the requester, their reason, and Approve or Deny</li>
+              <li>📤 <strong>Your requests</strong>: track pending / approved / denied / sharing-stopped status, and copy currently approved IDs</li>
+              <li>🔒 Only the two people involved can ever see a request (enforced at database level)</li>
+              <li>🧾 Approving shares <strong>your current ID snapshot</strong> with that one person only</li>
+              <li>🔒 <strong>Stop sharing</strong>: review everyone you shared your ID with and revoke any approved share</li>
             </ul>
           </div>
         </div>
@@ -1802,7 +4851,7 @@
       </div><!-- /help-slides -->
       <div class="help-nav">
         <button id="help-prev" class="help-prev">← Previous</button>
-        <span id="help-step-counter" class="help-step-counter">1 / 6</span>
+        <span id="help-step-counter" class="help-step-counter">1 / 7</span>
         <button id="help-next" class="help-next">Next →</button>
       </div>
     </div>
@@ -1817,6 +4866,23 @@
 
   <!-- Right-click / long-press context menu for messages -->
   <div id="context-menu" class="context-menu"></div>
+
+  <!-- Contact Modal -->
+  <div id="contact-modal" class="modal-overlay">
+    <div class="modal">
+      <h3>☎️ Contact the operator</h3>
+      <p>Use these official links for abuse reports, privacy requests, security concerns, project updates, and support. Do not send passwords, passkeys, or unnecessary sensitive information.</p>
+      <div style="display:grid;grid-template-columns:1fr;gap:10px;margin:14px 0">
+        <a class="secondary" href="https://wa.me/2349023785212" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:block;text-align:center;padding:11px 12px;border-radius:10px">💬 WhatsApp · +234 902 378 5212</a>
+        <a class="secondary" href="https://www.instagram.com/not_udo2025/" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:block;text-align:center;padding:11px 12px;border-radius:10px">📸 Instagram · @not_udo2025</a>
+        <a class="secondary" href="https://www.youtube.com/@WhiteWanderer-j4w" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:block;text-align:center;padding:11px 12px;border-radius:10px">▶️ YouTube · @WhiteWanderer-j4w</a>
+        <a class="secondary" href="https://github.com/gamer-09" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:block;text-align:center;padding:11px 12px;border-radius:10px">💻 GitHub · gamer-09</a>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="close-contact" class="secondary">Close</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Edit Profile Modal -->
   <div id="edit-profile-modal" class="modal-overlay">
@@ -1833,15 +4899,47 @@
         <div style="margin-bottom:16px">
           <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px">Username</label>
           <input type="text" id="edit-username" placeholder="Your username" required style="width:100%">
+          <div id="username-change-warning" class="warning" style="display:none; margin-top:10px; margin-bottom:0">
+            <strong>Username change warning — this is permanent:</strong> saving a different username will delete everything tied to your previous name — all messages, reactions, read receipts, presence history, your profile row, and every room you own — and will issue a brand-new Client ID (old Client IDs are never reused).
+          </div>
         </div>
         <div style="margin-bottom:16px">
           <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px">Avatar URL</label>
           <input type="url" id="edit-avatar" placeholder="https://... (optional)" style="width:100%">
+          <div style="display:flex; gap:8px; margin-top:8px; align-items:center">
+            <button type="button" id="avatar-upload-btn" class="secondary">📷 Upload picture</button>
+            <span style="font-size:12px; color:var(--text-dim)">mobile & desktop — cropped to a square automatically</span>
+          </div>
+          <input type="file" id="avatar-file" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none">
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:13px">Appearance</label>
+          <label class="ui-choice" for="edit-glass-ui">
+            <input type="checkbox" id="edit-glass-ui">
+            <span class="ui-choice-body">
+              <b>🫧 Glass UI</b>
+              <small>Frosted, see-through panels over a live animated backdrop (flowing waves). Turn it off for the plain solid look — the choice is remembered on this browser.</small>
+            </span>
+          </label>
+          <label class="ui-choice" for="edit-notify">
+            <input type="checkbox" id="edit-notify">
+            <span class="ui-choice-body">
+              <b>🔔 Notifications outside the app</b>
+              <small>Show system notifications for new messages in other rooms, mentions of you and inbox requests — even when this tab is in the background or minimised. Your browser will ask for permission. On iPhone, add the site to your Home Screen first.</small>
+            </span>
+          </label>
+          <label class="ui-choice" for="edit-glass-motion">
+            <input type="checkbox" id="edit-glass-motion">
+            <span class="ui-choice-body">
+              <b>Live backdrop animation</b>
+              <small>Uncheck to freeze the waves. Motion is off automatically if your device asks for reduced motion.</small>
+            </span>
+          </label>
         </div>
         <div style="margin-bottom:16px">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size: 13px;">
             <input type="checkbox" id="edit-terms" required>
-            <span>I agree to the <a href="/terms.html" target="_blank" style="color:var(--accent); text-decoration:none;">Terms and Conditions</a></span>
+            <span>I agree to the <a href="terms.html" target="_blank" rel="noopener noreferrer" style="color:var(--accent); text-decoration:none;">Terms and Conditions</a></span>
           </label>
         </div>
         <div class="modal-actions">
@@ -1857,7 +4955,7 @@
     <div class="modal">
       <h3>⚠️ Delete Room</h3>
       <div class="warning">
-        <strong>Warning:</strong> This action cannot be undone. All messages in this room will be permanently deleted.
+        <strong>Warning:</strong> This removes the room's message records and cannot be undone through the app. Uploaded storage objects or provider backups may remain.
       </div>
       <p>Delete room "<strong id="delete-room-name"></strong>"?</p>
       <div class="modal-actions">
@@ -1866,7 +4964,24 @@
       </div>
     </div>
   </div>
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="/client.js"></script>
+  <!-- Tablet people-panel backdrop -->
+  <div id="tablet-people-backdrop"></div>
+
+  <script src="vendor/supabase.min.js"></script>
+  <script>
+    // per-load cache-busting: stale JS can never run again
+    document.write('<link rel="stylesheet" href="mobile.css?t=' + Date.now() + '" media="(max-width: 768px)">');
+    document.write('<script src="glass-backdrop.js?t=' + Date.now() + '"><\/script>');
+    document.write('<script src="halloween.js?t=' + Date.now() + '"><\/script>');
+    document.write('<script src="christmas.js?t=' + Date.now() + '"><\/script>');
+    document.write('<script src="supabase-client.js?t=' + Date.now() + '"><\/script>');
+    document.write('<script src="chat-ux.js?t=' + Date.now() + '"><\/script>');
+    document.write('<script src="client.js?t=' + Date.now() + '"><\/script>');
+    document.write('<script src="halloween-notice.js?t=' + Date.now() + '"><\/script>');
+    document.write('<script src="christmas-notice.js?t=' + Date.now() + '"><\/script>');
+    document.write('<script src="update-check.js?t=' + Date.now() + '"><\/script>');
+    document.write('<script src="bug-report.js?t=' + Date.now() + '"><\/script>');
+  </script>
+<!-- © 2026 gamer-09. All rights reserved. Code is proprietary. -->
 </body>
 </html>
