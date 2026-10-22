@@ -2990,9 +2990,122 @@
       background: linear-gradient(180deg, #ff7518, #7c3aed);
       border-radius: 6px;
     }
+
+    /* ── one-time Halloween update notice ───────────────────────────────── */
+    #hw-notice .hw-notice-card {
+      position: relative;
+      max-width: 520px;
+      padding: 26px 26px 20px;
+      text-align: center;
+      /* Must stay scrollable: on short screens the content exceeds the card, and
+         mobile.css relies on .modal { overflow-y:auto } to reveal the CTA. An
+         `overflow:hidden` here would clip the primary button unreachably. */
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      max-height: 88vh;
+      max-height: 88dvh;
+      background:
+        radial-gradient(120% 90% at 50% -10%, rgba(255, 117, 24, .16), transparent 60%),
+        linear-gradient(158deg, rgba(33, 13, 56, .97), rgba(10, 4, 20, .98)) !important;
+      border: 1px solid rgba(255, 117, 24, .34) !important;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .7), 0 0 0 1px rgba(168, 85, 247, .18) inset,
+                  0 0 44px rgba(255, 117, 24, .16);
+    }
+    #hw-notice .hw-notice-glow {
+      position: absolute;
+      top: 0; left: 50%;
+      width: 240px; height: 96px;
+      margin-left: -120px;
+      background: radial-gradient(closest-side, rgba(255, 138, 43, .30), transparent);
+      pointer-events: none;
+      animation: hw-notice-pulse 4.5s ease-in-out infinite;
+    }
+    #hw-notice .hw-notice-emoji {
+      font-size: 46px;
+      line-height: 1;
+      margin: 2px 0 10px;
+      filter: drop-shadow(0 0 16px rgba(255, 117, 24, .55));
+      animation: hw-bob 3.2s ease-in-out infinite;
+    }
+    #hw-notice h3 {
+      margin: 0 0 10px !important;
+      font-size: 22px !important;
+      color: #ffd7a8 !important;
+      text-shadow: 0 0 24px rgba(255, 117, 24, .4);
+    }
+    #hw-notice p {
+      margin: 0 0 14px;
+      color: rgba(240, 226, 255, .88) !important;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    #hw-notice .hw-notice-list {
+      margin: 0 0 18px;
+      padding: 0;
+      list-style: none;
+      text-align: left;
+      display: grid;
+      gap: 9px;
+    }
+    #hw-notice .hw-notice-list li {
+      display: flex;
+      gap: 9px;
+      align-items: flex-start;
+      padding: 9px 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: rgba(235, 220, 255, .92);
+      background: rgba(124, 58, 237, .14);
+      border: 1px solid rgba(168, 85, 247, .22);
+      border-radius: 9px;
+    }
+    #hw-notice .hw-notice-list strong { color: #ffb066; font-weight: 600; }
+    #hw-notice .hw-notice-actions { display: flex; justify-content: center; }
+    #hw-notice .hw-notice-actions button {
+      width: 100%;
+      padding: 12px 18px;
+      font-size: 15px;
+      font-weight: 600;
+      border: 0;
+      border-radius: 10px;
+      cursor: pointer;
+      color: #240b02;
+      background: linear-gradient(180deg, #ffa14a, #ff7518);
+      box-shadow: 0 8px 24px rgba(255, 117, 24, .32);
+      transition: transform .14s ease, box-shadow .14s ease, filter .14s ease;
+    }
+    #hw-notice .hw-notice-actions button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.06);
+      box-shadow: 0 11px 28px rgba(255, 117, 24, .42);
+    }
+    #hw-notice .hw-notice-actions button:active { transform: translateY(0); }
+    #hw-notice .hw-notice-foot {
+      margin: 14px 0 0 !important;
+      font-size: 12.5px !important;
+      color: rgba(214, 190, 240, .78) !important;
+    }
+    #hw-notice .help-close {
+      position: absolute;
+      top: 10px; right: 12px;
+      z-index: 2;
+    }
+    @keyframes hw-notice-pulse {
+      0%, 100% { opacity: .55; transform: scale(1); }
+      50%      { opacity: .95; transform: scale(1.08); }
+    }
+    @media (max-width: 540px) {
+      #hw-notice .hw-notice-card { padding: 22px 16px 16px; }
+      #hw-notice .hw-notice-emoji { font-size: 40px; }
+      #hw-notice h3 { font-size: 19px !important; }
+      #hw-notice .hw-notice-list li { padding: 8px 10px; font-size: 12.5px; }
+    }
     @media (prefers-reduced-motion: reduce) {
       html.ptr29-halloween .brand svg,
-      html.ptr29-halloween #halloween-btn { animation: none !important; }
+      html.ptr29-halloween #halloween-btn,
+      #hw-notice .hw-notice-emoji,
+      #hw-notice .hw-notice-glow { animation: none !important; }
     }
 
   </style>
@@ -3753,6 +3866,7 @@
     document.write('<script src="supabase-client.js?t=' + Date.now() + '"><\/script>');
     document.write('<script src="chat-ux.js?t=' + Date.now() + '"><\/script>');
     document.write('<script src="client.js?t=' + Date.now() + '"><\/script>');
+    document.write('<script src="halloween-notice.js?t=' + Date.now() + '"><\/script>');
   </script>
 <!-- © 2026 gamer-09. All rights reserved. Code is proprietary. -->
 </body>
