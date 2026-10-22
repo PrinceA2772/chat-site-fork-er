@@ -1080,6 +1080,32 @@
       });
     },
 
+    // ── Bug reports ──────────────────────────────────────────────────────────
+    // Goes through a SECURITY DEFINER RPC so validation, length clamps and
+    // rate limiting all happen server-side (see supabase/037_bug_reports.sql).
+    // Deliberately works for a logged-out visitor too: reporting a bug is the
+    // one action that should never be gated behind an account.
+    submitBugReport: function (payload) {
+      var p = payload || {};
+      var f = function (v, max) { return String(v == null ? '' : v).trim().slice(0, max); };
+      return sb.rpc('submit_bug_report', {
+        p_kind: f(p.kind, 20) || 'bug',
+        p_title: f(p.title, 160),
+        p_details: f(p.details, 6000),
+        p_steps: f(p.steps, 3000),
+        p_severity: f(p.severity, 20) || 'normal',
+        p_page_url: f(p.pageUrl, 400),
+        p_user_agent: f(p.userAgent, 400),
+        p_viewport: f(p.viewport, 40),
+        p_theme: f(p.theme, 40),
+        p_build: f(p.build, 60),
+        p_contact: f(p.contact, 200)
+      }).then(function (r) {
+        if (r.error) return { ok: false, error: r.error.message };
+        return (r.data && typeof r.data === 'object') ? r.data : { ok: false, error: 'bad_response' };
+      }).catch(function () { return { ok: false, error: 'network' }; });
+    },
+
     resolveRequest: function (id, approve) {
       return sb.from('id_requests').update({
         status: approve ? 'approved' : 'denied',

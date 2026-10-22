@@ -86,7 +86,7 @@
     });
 
     // Next frame so the .open transition actually runs.
-    requestAnimationFrame(function () { overlay.classList.add('open'); });
+    requestAnimationFrame(function () { if (overlay) overlay.classList.add('open'); });
   }
 
   // Poll for a clear screen rather than guessing a fixed delay: the age gate,

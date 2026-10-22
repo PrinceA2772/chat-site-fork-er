@@ -1,0 +1,173 @@
+# Mirror in-site bug reports into GitHub issues.
+#
+# The site writes reports to the Supabase `bug_reports` table (see
+# supabase/037_bug_reports.sql). This workflow polls that table and opens one
+# issue per report, so every report lands in this repo's issue tracker where
+# the operator can triage it.
+#
+# WHY A WORKFLOW INSTEAD OF THE BROWSER POSTING TO GITHUB DIRECTLY:
+# opening an issue through the GitHub API needs a token with `issues: write`.
+# A token in client-side JavaScript is readable by anyone who opens devtools,
+# so it would let a stranger act as the repo owner. The runner's GITHUB_TOKEN
+# is injected by GitHub at run time, is scoped to this repository, and expires
+# when the job ends — nothing secret is ever shipped to a browser.
+#
+# REQUIRED REPOSITORY SECRET
+#   SUPABASE_SERVICE_KEY — the Supabase service_role key for this project.
+#     Add it at: Settings → Secrets and variables → Actions → New repository
+#     secret. It is used ONLY here, server-side, to read the reports table.
+#     Never put it in Chatting_updated/public/**.
+#
+# Until that secret exists the workflow exits cleanly without failing, so it is
+# safe to merge before the secret is configured.
+
+name: Mirror bug reports to issues
+
+on:
+  schedule:
+    # every 15 minutes; GitHub may delay scheduled runs under load
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: bug-report-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: Open issues for new reports
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the secret is configured
+        id: guard
+        env:
+          KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::notice::SUPABASE_SERVICE_KEY is not set — skipping. Add it in Settings → Secrets and variables → Actions to enable report mirroring."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch new reports
+        if: steps.guard.outputs.skip == 'false'
+        env:
+          SUPABASE_URL: https://vjrnabnawhegjdsvbyrc.supabase.co
+          KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          set -euo pipefail
+          # status=new and not yet mirrored (issue_number is null)
+          curl -sS --fail \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY" \
+            -H "Accept: application/json" \
+            "$SUPABASE_URL/rest/v1/bug_reports?select=id,kind,title,details,steps,severity,page_url,user_agent,viewport,theme,build,reporter_name,contact,created_at&status=eq.new&issue_number=is.null&order=created_at.asc&limit=20" \
+            -o reports.json
+          echo "reports found: $(jq 'length' reports.json)"
+          jq -c '.[]' reports.json > reports.ndjson || true
+          cat reports.ndjson
+
+      - name: Open an issue per report
+        if: steps.guard.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUPABASE_URL: https://vjrnabnawhegjdsvbyrc.supabase.co
+          KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ ! -s reports.ndjson ]; then
+            echo "nothing to mirror"
+            exit 0
+          fi
+
+          while IFS= read -r row; do
+            [ -z "$row" ] && continue
+
+            id=$(jq -r '.id' <<<"$row")
+            kind=$(jq -r '.kind' <<<"$row")
+            severity=$(jq -r '.severity' <<<"$row")
+            title=$(jq -r '.title' <<<"$row")
+            details=$(jq -r '.details' <<<"$row")
+            steps=$(jq -r '.steps' <<<"$row")
+            page_url=$(jq -r '.page_url' <<<"$row")
+            ua=$(jq -r '.user_agent' <<<"$row")
+            viewport=$(jq -r '.viewport' <<<"$row")
+            theme=$(jq -r '.theme' <<<"$row")
+            build=$(jq -r '.build' <<<"$row")
+            reporter=$(jq -r '.reporter_name' <<<"$row")
+            contact=$(jq -r '.contact' <<<"$row")
+            created=$(jq -r '.created_at' <<<"$row")
+
+            # Labels must exist or `gh issue create` fails; create them quietly first.
+            case "$severity" in
+              critical) sev_label="severity: critical" ;;
+              high)     sev_label="severity: high" ;;
+              low)      sev_label="severity: low" ;;
+              *)        sev_label="severity: normal" ;;
+            esac
+            gh label create "$sev_label" --force --color "B60205" >/dev/null 2>&1 || true
+            gh label create "source: in-app" --force --color "1D76DB" >/dev/null 2>&1 || true
+            gh label create "type: $kind" --force --color "5319E7" >/dev/null 2>&1 || true
+
+            body=$(cat <<EOF
+          **Reported from the live site** · $created
+
+          | | |
+          |---|---|
+          | **Kind** | $kind |
+          | **Severity** | $severity |
+          | **Reporter** | ${reporter:-anonymous} |
+          | **Contact** | ${contact:-(not given)} |
+          | **Build** | ${build:-unknown} |
+          | **Theme** | ${theme:-unknown} |
+          | **Viewport** | ${viewport:-unknown} |
+          | **Page** | ${page_url:-unknown} |
+
+          ### What happened
+
+          $details
+
+          ### Steps to reproduce
+
+          ${steps:-(not given)}
+
+          <details><summary>User agent</summary>
+
+          \`\`\`
+          ${ua:-unknown}
+          \`\`\`
+
+          </details>
+
+          ---
+          _Mirrored automatically from \`bug_reports.id = $id\`. Close this issue once resolved._
+          EOF
+          )
+
+            url=$(gh issue create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "[$severity] $title" \
+              --body "$body" \
+              --label "source: in-app" \
+              --label "type: $kind" \
+              --label "$sev_label" \
+              | tail -n1)
+
+            number=$(basename "$url")
+            echo "opened #$number for report $id"
+
+            # Mark mirrored so the next run can't reopen a duplicate.
+            curl -sS --fail -X PATCH \
+              -H "apikey: $KEY" \
+              -H "Authorization: Bearer $KEY" \
+              -H "Content-Type: application/json" \
+              -H "Prefer: return=minimal" \
+              "$SUPABASE_URL/rest/v1/bug_reports?id=eq.$id" \
+              -d "{\"issue_number\": $number, \"status\": \"triaged\"}" \
+              >/dev/null
+          done < reports.ndjson

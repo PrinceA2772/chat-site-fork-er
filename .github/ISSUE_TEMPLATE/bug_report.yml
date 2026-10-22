@@ -1,0 +1,65 @@
+name: Bug report
+description: Something on the site is broken or looks wrong
+title: "[Bug] "
+labels: ["source: github", "type: bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve ptr_29 Chat.
+
+        **Do not report security or privacy vulnerabilities here.** Please use
+        the [security policy](https://github.com/gamer-09/chat-site/security/policy)
+        instead — that route is private.
+
+        Tip: the in-app **🐞 Report a problem** button submits the technical
+        details below automatically, so you can use that instead.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what actually happened.
+      placeholder: I opened #general, sent a message, and it disappeared after I switched rooms.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to …
+        2. Tap …
+        3. See …
+    validations:
+      required: false
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: How much does it get in the way?
+      options:
+        - Minor — cosmetic, no rush
+        - Normal — it gets in the way
+        - Major — a feature is unusable
+        - Critical — data loss or security
+    validations:
+      required: true
+
+  - type: input
+    id: build
+    attributes:
+      label: Build
+      description: Shown under the in-app reporter's "Technical details", or in `version.json`.
+      placeholder: e.g. 20087f5a1b2c
+    validations:
+      required: false
+
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      placeholder: e.g. Android 14, Chrome 155
+    validations:
+      required: false

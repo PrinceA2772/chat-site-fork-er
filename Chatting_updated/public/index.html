@@ -2743,6 +2743,270 @@
       color: var(--text) !important;
     }
 
+    /* ── LIGHT "daytime Halloween" palette ───────────────────────────────
+       The dark palette above is scoped to html.ptr29-halloween only, so it
+       used to win inside light mode too. Because the light theme's own
+       !important rules for #sidebar / #input-area / .room still applied,
+       the two produced a patchwork: white panels carrying dark-theme text.
+       Re-pointing the same variables here (and overriding the handful of
+       literals below) gives light mode its own readable autumn palette. */
+    html.ptr29-light-theme.ptr29-halloween {
+      color-scheme: light !important;
+      background: #fbf3e6 !important;
+      --bg: #fbf3e6 !important;
+      --panel: #fffaf1 !important;
+      --panel2: #fdf1dd !important;
+      --border: rgba(154, 82, 12, .28) !important;
+      --border-light: rgba(194, 104, 16, .40) !important;
+      --accent: #c2410c !important;
+      --accent-hover: #9a3412 !important;
+      --accent2: #7c3aed !important;
+      --text: #2c1608 !important;
+      --text-muted: #6b4423 !important;
+      --text-dim: #8a6a4a !important;
+      --danger: #b91c1c !important;
+      --danger-hover: #991b1b !important;
+      --success: #15803d !important;
+      --warning: #a16207 !important;
+      --composer-bg: #fffaf1 !important;
+      --composer-surface: #fdf1dd !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween {
+      color: var(--text) !important;
+    }
+    /* The night sky is wrong in daylight: swap in a warm autumn haze. */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #glass-backdrop {
+      background:
+        radial-gradient(120% 90% at 68% 12%, #ffe8c9 0%, #fbe0c0 44%, #f6cfae 100%) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween #gb-scrim {
+      background:
+        radial-gradient(120% 92% at 50% 34%, rgba(255, 246, 232, 0) 42%, rgba(120, 62, 12, .16) 100%),
+        linear-gradient(180deg, rgba(255, 250, 240, .10), rgba(140, 74, 18, .10)) !important;
+    }
+    /* Readable surfaces: cream glass instead of the dark violet glass. */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween header,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #sidebar,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #online-panel,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #room-bar,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #input-area,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #rooms-header,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #online-header,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #chat-form,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #room-settings-panel,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #mobile-nav,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .modal,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .help-modal-inner,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .context-menu,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .online-menu,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .inbox-popup,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .ag-card {
+      background: linear-gradient(158deg, rgba(255, 250, 241, .93), rgba(253, 240, 219, .90)) !important;
+      border-color: rgba(154, 82, 12, .24) !important;
+      box-shadow: 0 18px 44px rgba(120, 62, 12, .14), inset 0 1px 0 rgba(255, 255, 255, .70) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #chat {
+      background:
+        radial-gradient(1000px 60% at 92% 0%, rgba(255, 145, 40, .10), transparent 62%),
+        radial-gradient(900px 55% at 4% 100%, rgba(168, 85, 247, .07), transparent 64%),
+        linear-gradient(160deg, rgba(255, 250, 240, .55), rgba(252, 236, 214, .68)) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #messages {
+      background: linear-gradient(180deg, rgba(255, 248, 238, .10), rgba(250, 232, 208, .30)) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #room-info-banner {
+      background: rgba(255, 244, 228, .80) !important;
+      border-color: rgba(154, 82, 12, .22) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #mobile-nav {
+      border-top: 1px solid rgba(194, 104, 16, .26) !important;
+      box-shadow: 0 -10px 26px rgba(120, 62, 12, .12) !important;
+    }
+    /* Message bubbles on cream, with enough contrast for the dark ink. */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg {
+      background: linear-gradient(155deg, rgba(255, 252, 245, .96), rgba(253, 241, 223, .95)) !important;
+      border-color: rgba(154, 82, 12, .22) !important;
+      color: var(--text) !important;
+      box-shadow: 0 8px 20px rgba(120, 62, 12, .10), inset 0 1px 0 rgba(255, 255, 255, .80) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg.me {
+      background: linear-gradient(135deg, rgba(255, 176, 92, .40), rgba(214, 168, 255, .38)) !important;
+      border-color: rgba(194, 104, 16, .42) !important;
+      box-shadow: 0 8px 22px rgba(194, 104, 16, .14), inset 0 1px 0 rgba(255, 255, 255, .60) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg.reply { border-left: 3px solid #c2410c !important; }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg.image-msg,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .link-preview-card {
+      background: linear-gradient(155deg, rgba(255, 251, 243, .96), rgba(252, 238, 218, .95)) !important;
+      border-color: rgba(154, 82, 12, .22) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg img.msg-image {
+      border-color: rgba(194, 104, 16, .30) !important;
+      background: #fdf6ec !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .receipts { color: #6b4423 !important; }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg.me .receipts { color: #5a3413 !important; }
+    /* Rooms, chips, menus */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .room,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .file-attachment,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .reaction-pill,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg-actions,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .ui-choice,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .chip,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #user-avatar-preview {
+      background: rgba(255, 250, 242, .88) !important;
+      border-color: rgba(154, 82, 12, .20) !important;
+      color: var(--text) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .70) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .room:hover,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .online-item:hover {
+      background: rgba(255, 150, 50, .16) !important;
+      border-color: rgba(194, 104, 16, .34) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .online-menu button:hover {
+      background: rgba(255, 150, 50, .16) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .room.active {
+      background: linear-gradient(135deg, #ea6a12, #b4470e) !important;
+      border-color: rgba(180, 71, 14, .70) !important;
+      color: #fff !important;
+      box-shadow: 0 4px 14px rgba(194, 104, 16, .26) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .room.active .room-name,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .room.active .room-meta { color: #fff !important; }
+    /* Inputs */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween input,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween select,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween textarea,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #text,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #username,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #avatar,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #mobile-username,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #people-search,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #search-messages-input,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #mobile-search-input,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #passkey-join-input {
+      background: rgba(255, 253, 248, .96) !important;
+      border-color: rgba(154, 82, 12, .26) !important;
+      color: var(--text) !important;
+      -webkit-text-fill-color: var(--text) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .80) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween input::placeholder,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween textarea::placeholder { color: #8a6a4a !important; }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween input:focus,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween select:focus,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween textarea:focus {
+      border-color: rgba(194, 104, 16, .60) !important;
+      box-shadow: 0 0 0 2px rgba(194, 104, 16, .16) !important;
+    }
+    /* Buttons */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween button.secondary,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #emoji-btn,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #file-btn,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #image-btn {
+      background: rgba(255, 250, 242, .92) !important;
+      border: 1px solid rgba(154, 82, 12, .26) !important;
+      color: #3d1f0a !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween button.secondary:hover,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #emoji-btn:hover,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #file-btn:hover,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #image-btn:hover {
+      background: rgba(255, 236, 214, .96) !important;
+      border-color: rgba(194, 104, 16, .46) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #send-btn {
+      background: linear-gradient(135deg, #ea6a12, #c2410c) !important;
+      color: #fff !important;
+      box-shadow: 0 4px 14px rgba(194, 104, 16, .28), inset 0 1px 0 rgba(255, 255, 255, .40) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #send-btn:hover {
+      background: linear-gradient(135deg, #f5791f, #d94c0c) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #reply-preview-bar {
+      background: rgba(255, 150, 50, .16) !important;
+    }
+    /* Accents: orange on cream needs to be much darker than orange on black. */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .mention,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg.me .mention {
+      color: #9a3412 !important;
+      background: rgba(234, 106, 18, .16) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .mention.mention-me {
+      color: #7c2d12 !important;
+      background: rgba(234, 106, 18, .26) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg-content a.safe-link,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg.me .msg-content a.safe-link {
+      color: #9a3412 !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .msg-content a.safe-link:hover {
+      color: #7c2d12 !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .sys,
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #typing { color: #6b4423 !important; }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .banner-view-btn {
+      color: #9a3412 !important;
+      border-color: rgba(194, 104, 16, .45) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .banner-view-btn:hover {
+      background: #c2410c !important;
+      color: #fff !important;
+      border-color: #c2410c !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween mark.search-hit {
+      background: rgba(255, 150, 50, .40) !important;
+      color: #2c1608 !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween mark.search-hit.active {
+      background: #ea6a12 !important;
+      color: #fff !important;
+    }
+    /* Scrims stay dark enough to separate the dialog from the page. */
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .modal-overlay {
+      background: rgba(60, 28, 4, .42) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .ag-overlay {
+      background: radial-gradient(90% 80% at 50% 38%, rgba(255, 240, 220, .34), rgba(70, 34, 6, .56)) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween .toast {
+      background: rgba(255, 250, 241, .97) !important;
+      border-color: rgba(154, 82, 12, .30) !important;
+      color: var(--text) !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween .brand-name { text-shadow: 0 0 16px rgba(194, 104, 16, .22); }
+    html.ptr29-light-theme.ptr29-halloween .bn-accent { color: #c2410c !important; }
+    html.ptr29-light-theme.ptr29-halloween .brand svg { filter: drop-shadow(0 0 8px rgba(194, 104, 16, .35)); }
+    html.ptr29-light-theme.ptr29-halloween #halloween-btn {
+      box-shadow: 0 0 14px rgba(194, 104, 16, .28);
+    }
+    html.ptr29-light-theme.ptr29-halloween ::-webkit-scrollbar-track { background: rgba(247, 231, 210, .80); }
+    html.ptr29-light-theme.ptr29-halloween ::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #e0812f, #a855f7);
+    }
+    /* The "daylight" notice card + update prompt */
+    html.ptr29-light-theme.ptr29-halloween #hw-notice .hw-notice-card {
+      background:
+        radial-gradient(120% 90% at 50% -10%, rgba(255, 145, 40, .16), transparent 60%),
+        linear-gradient(158deg, rgba(255, 251, 244, .98), rgba(253, 240, 219, .98)) !important;
+      border: 1px solid rgba(194, 104, 16, .38) !important;
+      box-shadow: 0 22px 60px rgba(120, 62, 12, .26), 0 0 0 1px rgba(168, 85, 247, .12) inset !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween #hw-notice h3 { color: #9a3412 !important; text-shadow: none; }
+    html.ptr29-light-theme.ptr29-halloween #hw-notice p { color: #4a2a10 !important; }
+    html.ptr29-light-theme.ptr29-halloween #hw-notice .hw-notice-list li {
+      background: rgba(255, 150, 50, .12) !important;
+      border-color: rgba(194, 104, 16, .26) !important;
+      color: #3d1f0a !important;
+    }
+    html.ptr29-light-theme.ptr29-halloween #hw-notice .hw-notice-list strong { color: #9a3412 !important; }
+    html.ptr29-light-theme.ptr29-halloween #hw-notice .hw-notice-foot { color: #6b4423 !important; }
+    html.ptr29-light-theme.ptr29-halloween #hw-notice .hw-notice-actions button {
+      background: linear-gradient(180deg, #ea6a12, #b4470e) !important; color: #fff !important;
+    }
+
     /* ── the seasonal canvas replaces the glass waves ───────────────────── */
     html.ptr29-halloween body.ptr29-halloween #glass-backdrop {
       display: block !important;
@@ -2903,12 +3167,14 @@
       border-color: rgba(255, 138, 44, .50) !important;
     }
     html.ptr29-halloween body.ptr29-halloween #send-btn {
-      background: linear-gradient(135deg, #ff8a2b, #e8590c) !important;
+      /* Was #ff8a2b→#e8590c: white on the light end only reached 2.35:1, so
+         the label washed out on dark. Darkened both stops to clear 4.5:1. */
+      background: linear-gradient(135deg, #c2410c, #9a3412) !important;
       color: #fff !important;
       box-shadow: 0 0 22px rgba(255, 117, 24, .35), inset 0 1px 0 rgba(255, 230, 200, .45) !important;
     }
     html.ptr29-halloween body.ptr29-halloween #send-btn:hover {
-      background: linear-gradient(135deg, #ffa04a, #f4690f) !important;
+      background: linear-gradient(135deg, #e8590c, #b4470e) !important;
     }
     html.ptr29-halloween body.ptr29-halloween #reply-preview-bar { background: rgba(255, 117, 24, .12) !important; }
 
@@ -3101,11 +3367,132 @@
       #hw-notice h3 { font-size: 19px !important; }
       #hw-notice .hw-notice-list li { padding: 8px 10px; font-size: 12.5px; }
     }
+    /* ── update-available notice ────────────────────────────────────────── */
+    #update-notice .update-notice-card {
+      max-width: 460px;
+      padding: 26px 24px 20px;
+      text-align: center;
+      background: linear-gradient(158deg, var(--panel2), var(--panel)) !important;
+      border: 1px solid var(--border) !important;
+      box-shadow: 0 22px 60px rgba(0, 0, 0, .42);
+    }
+    #update-notice .update-notice-icon {
+      font-size: 42px;
+      line-height: 1;
+      margin-bottom: 10px;
+      animation: up-pop 2.6s ease-in-out infinite;
+    }
+    #update-notice h3 { margin: 0 0 10px !important; font-size: 19px !important; }
+    #update-notice p { margin: 0 0 18px; font-size: 14px; line-height: 1.55; color: var(--text-muted) !important; }
+    #update-notice .update-notice-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    #update-notice .update-notice-actions button { flex: 1; min-width: 130px; padding: 11px 16px; }
+    @keyframes up-pop {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50%      { transform: translateY(-3px) rotate(-3deg); }
+    }
+
+    /* ── report a bug ───────────────────────────────────────────────────── */
+    #bug-report-modal .bug-report-card {
+      max-width: 520px;
+      text-align: left;
+      padding: 24px 24px 18px;
+    }
+    #bug-report-modal h3 { margin: 0 0 8px !important; font-size: 20px !important; }
+    #bug-report-modal .bug-report-lead {
+      margin: 0 0 16px;
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--text-muted);
+    }
+    #bug-report-modal .bug-field {
+      display: block;
+      margin-bottom: 13px;
+    }
+    #bug-report-modal .bug-field > span {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    #bug-report-modal .bug-field > span em {
+      font-style: normal;
+      font-weight: 400;
+      color: var(--text-dim);
+      font-size: 11.5px;
+    }
+    #bug-report-modal .bug-field input,
+    #bug-report-modal .bug-field select,
+    #bug-report-modal .bug-field textarea {
+      width: 100%;
+      box-sizing: border-box;
+      font-family: inherit;
+      font-size: 14px;
+    }
+    #bug-report-modal .bug-field textarea { resize: vertical; min-height: 68px; }
+    #bug-report-modal .bug-details-auto {
+      margin: 4px 0 14px;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    #bug-report-modal .bug-details-auto summary { cursor: pointer; }
+    #bug-report-modal .bug-details-auto pre {
+      margin: 8px 0 0;
+      padding: 10px 12px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 11.5px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      background: rgba(0, 0, 0, .22);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    html.ptr29-light-theme #bug-report-modal .bug-details-auto pre { background: rgba(15, 23, 42, .05); }
+    #bug-report-modal .bug-report-status {
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, .05);
+    }
+    #bug-report-modal .bug-report-status.error {
+      border-color: rgba(239, 68, 68, .45);
+      background: rgba(239, 68, 68, .12);
+    }
+    #bug-report-modal .bug-report-status.success {
+      border-color: rgba(74, 222, 128, .45);
+      background: rgba(74, 222, 128, .12);
+    }
+    #bug-report-modal .bug-report-actions { gap: 10px; flex-wrap: wrap; }
+    #bug-report-modal .bug-report-actions button { flex: 1; min-width: 120px; padding: 11px 16px; }
+    #bug-report-modal .bug-report-foot {
+      margin: 14px 0 0;
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--text-dim);
+    }
+    #bug-report-modal .bug-report-foot a { color: var(--accent); }
+    #bug-report-btn { font-size: 15px; }
+    @media (max-width: 540px) {
+      #bug-report-modal .bug-report-card { padding: 20px 15px 14px; }
+      #bug-report-modal h3 { font-size: 18px !important; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       html.ptr29-halloween .brand svg,
       html.ptr29-halloween #halloween-btn,
       #hw-notice .hw-notice-emoji,
-      #hw-notice .hw-notice-glow { animation: none !important; }
+      #hw-notice .hw-notice-glow,
+      #update-notice .update-notice-icon { animation: none !important; }
     }
 
   </style>
@@ -3867,6 +4254,8 @@
     document.write('<script src="chat-ux.js?t=' + Date.now() + '"><\/script>');
     document.write('<script src="client.js?t=' + Date.now() + '"><\/script>');
     document.write('<script src="halloween-notice.js?t=' + Date.now() + '"><\/script>');
+    document.write('<script src="update-check.js?t=' + Date.now() + '"><\/script>');
+    document.write('<script src="bug-report.js?t=' + Date.now() + '"><\/script>');
   </script>
 <!-- © 2026 gamer-09. All rights reserved. Code is proprietary. -->
 </body>

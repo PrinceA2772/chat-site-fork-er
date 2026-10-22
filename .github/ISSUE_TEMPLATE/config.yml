@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Report a security vulnerability (private)
+    url: https://github.com/gamer-09/chat-site/security/advisories/new
+    about: Security and privacy issues must not be filed publicly. Use the private advisory form.
+  - name: 💬 Contact the operator
+    url: https://wa.me/2349023785212
+    about: Account, privacy or abuse questions that are not bugs.
+  - name: ❓ How to use ptr_29 Chat
+    url: https://gamer-09.github.io/chat-site/
+    about: The in-site help guide and guided tour walk through every feature.
