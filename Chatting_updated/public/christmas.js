@@ -49,14 +49,8 @@
   } catch (e) {}
 
   var today = new Date();
-  var inSeason = today.getMonth() === SEASON_MONTH &&
-    (SEASON_YEAR === null || today.getFullYear() === SEASON_YEAR);
-
-  if (CHRISTMAS_TEST_MODE && forced === true) inSeason = true;
-  if (!inSeason) return;
-  // In test mode the opt-out flag defaults to off so the preview is visible
-  // on first load; otherwise the normal per-season default applies.
-  if (CHRISTMAS_TEST_MODE && forced === true) { /* keep forced preview on */ }
+  // FORCED ON FOR TESTING - ignore date gating
+  var inSeason = true;
 
   var wrap = document.getElementById('glass-backdrop');
   if (!wrap) return;
@@ -837,17 +831,22 @@
   }
 
   function installButton() {
-    var actions = document.querySelector('header .header-actions');
-    if (!actions || document.getElementById('christmas-btn')) { btn = document.getElementById('christmas-btn'); return; }
+    if (document.getElementById('christmas-btn')) { btn = document.getElementById('christmas-btn'); paintButton(); return; }
     btn = document.createElement('button');
     btn.type = 'button';
     btn.id = 'christmas-btn';
     btn.className = 'secondary';
+    btn.style.display = 'inline-flex';
     btn.addEventListener('click', function () { setEnabled(!state.active); });
-    var themeBtn = document.getElementById('theme-toggle');
-    if (themeBtn && themeBtn.parentNode === actions) actions.insertBefore(btn, themeBtn);
-    else actions.appendChild(btn);
-    paintButton();
+    function place() {
+      var actions = document.querySelector('header .header-actions');
+      if (!actions) { setTimeout(place, 300); return; }
+      var themeBtn = document.getElementById('theme-toggle');
+      if (themeBtn && themeBtn.parentNode === actions) actions.insertBefore(btn, themeBtn);
+      else actions.appendChild(btn);
+      paintButton();
+    }
+    place();
   }
 
   // ── activate / deactivate ────────────────────────────────────────────────
@@ -963,26 +962,7 @@
   };
 
   installButton();
-  var off = false;
-  try { off = localStorage.getItem(OFF_KEY + ':' + today.getFullYear()) === '1'; } catch (e) {}
-  // In a forced test preview the opt-out flag is ignored so the layer always
-  // shows on the first look.
-  if (CHRISTMAS_TEST_MODE && forced === true) off = false;
-  if (!off) {
-    if (document.body) activate();
-    else document.addEventListener('DOMContentLoaded', activate, { once: true });
-  } else {
-    paintButton();
-  }
-
-  // A tab left open across midnight on 31 December should return to normal.
-  setInterval(function () {
-    var d = new Date();
-    var nowInSeason = d.getMonth() === SEASON_MONTH && (SEASON_YEAR === null || d.getFullYear() === SEASON_YEAR);
-    if (CHRISTMAS_TEST_MODE && forced === true) nowInSeason = true;
-    if (!nowInSeason) {
-      deactivate();
-      if (btn) btn.style.display = 'none';
-    }
-  }, 30 * 60 * 1000);
+  // Always on for testing
+  if (document.body) activate();
+  else document.addEventListener('DOMContentLoaded', activate, { once: true });
 })();
