@@ -72,6 +72,8 @@
   var MAX_LINK_LENGTH = 2048;
   var BLOCKED_LINK_EXT = ['exe', 'msi', 'apk', 'ipa', 'dmg', 'pkg', 'bat', 'cmd', 'sh', 'ps1', 'vbs', 'scr', 'jar', 'js', 'mjs', 'wasm'];
   var HISTORY_LIMIT = 50;
+  // How many older messages each "Load older messages" click fetches.
+  var HISTORY_PAGE = 50;
   var SEARCH_LIMIT = 150;
   var PEOPLE_LIMIT = 120;
 
@@ -793,6 +795,33 @@
           var msgs = (res.data || [])
             .map(function (row) { return row.payload; })
             .filter(Boolean)
+            .sort(function (a, b) { return (a.timestamp || 0) - (b.timestamp || 0); })
+            .slice(-lim);
+          var ids = msgs.map(function (m) { return m && m.id; }).filter(Boolean);
+          return api.loadMetaTables(r, ids).then(function () {
+            return msgs.map(function (m) { return api.mergeMeta(r, m); });
+          });
+        });
+    },
+
+    // Older page of history for the "Load older messages" control.
+    // `before` is the timestamp of the oldest message currently on screen;
+    // everything strictly older than it comes back, newest-first internally
+    // then re-sorted ascending for rendering. Deliberately a separate method
+    // from getHistory() so the egress-tuned initial load is untouched.
+    getHistoryBefore: function (room, before, limit) {
+      var r = sanitizeRoom(room);
+      var lim = Math.max(1, Math.min(Number(limit || HISTORY_PAGE) || HISTORY_PAGE, 100));
+      var cur = Number(before);
+      if (!cur || !isFinite(cur)) return Promise.resolve([]);
+      return sb.from('messages').select('id, room, payload').eq('room', r)
+        .lt('payload->>timestamp', String(Math.floor(cur)))
+        .order('payload->>timestamp', { ascending: false }).limit(lim)
+        .then(function (res) {
+          var msgs = (res.data || [])
+            .map(function (row) { return row.payload; })
+            .filter(Boolean)
+            .filter(function (m) { return Number(m.timestamp) < cur; })
             .sort(function (a, b) { return (a.timestamp || 0) - (b.timestamp || 0); })
             .slice(-lim);
           var ids = msgs.map(function (m) { return m && m.id; }).filter(Boolean);

@@ -145,9 +145,19 @@
     inboxNotifiedIds: new Set(),
     rooms: [],
     currentRoomPresence: [],
+    // Scrollback: timestamp of the oldest message currently rendered, and
+    // whether a request is in flight / history is exhausted.
+    oldestTs: null,
+    historyLoading: false,
+    historyExhausted: false,
   };
 
   // ── Constants ──────────────────────────────────────────────────────────────
+  // Messages pulled when first joining a room. Keep in sync with
+  // HISTORY_LIMIT in supabase-client.js — a shorter-than-full initial batch
+  // is how we know the room has no older history to page back through.
+  const INITIAL_HISTORY_LIMIT = 50;
+
   const CONSTANTS = {
     EDIT_WINDOW_MS: 5 * 60 * 1000,
     STORAGE_KEY:   'ptr29_profile_v2',
@@ -897,6 +907,7 @@
       elements.roomName.textContent = `#${roomName}`;
       rooms.render();
       elements.messages.innerHTML = '';
+      scrollback.reset();   // new room starts a fresh scrollback cursor
 
       // Server sends 'history' and 'rooms' after successful join — no REST needed
       socket.emit('join', {
@@ -1237,7 +1248,7 @@
 
   // ── Messages ───────────────────────────────────────────────────────────────
   const messages = {
-    render: (msg, prepend = false) => {
+    render: (msg, prepend = false, preserveScroll = false) => {
       if (!elements.messages) return;
       const isMe = isMineMsg(msg);
       const el = document.createElement('div');
@@ -1378,13 +1389,25 @@
         });
       }
 
-      prepend ? elements.messages.prepend(el) : elements.messages.appendChild(el);
-      // If the reader is scrolled up (and this is not their own message and not
-      // a backfill), stay where they are and let the jump button count it.
-      const stick = prepend || scrollCtl.near() || isMe;
-      if (stick) {
-        elements.messages.scrollTop = elements.messages.scrollHeight;
-        if (!prepend) scrollCtl.pending = 0;
+      const box = elements.messages;
+      // When backfilling older messages we keep the reader anchored to the same
+      // pixel offset instead of jumping to the bottom, so the message they were
+      // reading stays under the cursor.
+      const prevHeight = preserveScroll ? box.scrollHeight : 0;
+      const prevTop = preserveScroll ? box.scrollTop : 0;
+
+      prepend ? box.prepend(el) : box.appendChild(el);
+
+      if (preserveScroll) {
+        box.scrollTop = prevTop + (box.scrollHeight - prevHeight);
+      } else {
+        // If the reader is scrolled up (and this is not their own message and
+        // not a backfill), stay where they are and let the jump button count it.
+        const stick = prepend || scrollCtl.near() || isMe;
+        if (stick) {
+          box.scrollTop = box.scrollHeight;
+          if (!prepend) scrollCtl.pending = 0;
+        }
       }
       try { scrollCtl.refresh(); } catch (e) {}
 
@@ -1561,6 +1584,108 @@
           if (!picker.contains(e.target)) { picker.remove(); document.removeEventListener('click', once); }
         });
       }, 0);
+    },
+  };
+
+  // ── Older-message scrollback ───────────────────────────────────────────────
+  // Room history is intentionally capped (see README "Egress / bandwidth
+  // controls"): the initial load only fetches the latest HISTORY_LIMIT
+  // messages so joining a room does not pull an entire room's history every
+  // time. That is why older messages appeared to be "cut out" — they were
+  // never deleted, just never requested.
+  //
+  // This adds an explicit control at the top of the transcript that pulls one
+  // older page per click, keeping egress proportional to what is actually
+  // read instead of resuming a bulk download on every join.
+  const scrollback = {
+    btn: null,
+
+    reset() {
+      state.oldestTs = null;
+      state.historyLoading = false;
+      state.historyExhausted = false;
+      this.remove();
+    },
+
+    remove() {
+      if (this.btn && this.btn.parentNode) this.btn.parentNode.removeChild(this.btn);
+      this.btn = null;
+    },
+
+    // Records the timestamp of the earliest rendered message so the next page
+    // knows where to continue from.
+    noteOldest(ts) {
+      const n = Number(ts);
+      if (!n || !isFinite(n)) return;
+      if (state.oldestTs === null || n < state.oldestTs) state.oldestTs = n;
+    },
+
+    // Derive from the DOM when possible so rejoining/rendering stays accurate.
+    syncFromDom() {
+      const first = elements.messages && elements.messages.querySelector('.msg');
+      if (first && first.dataset.timestamp) {
+        const n = Number(first.dataset.timestamp);
+        if (n && isFinite(n)) state.oldestTs = n;
+      }
+    },
+
+    mount() {
+      this.remove();
+      if (!elements.messages) return;
+      if (state.historyExhausted && state.oldestTs === null) return;
+
+      const btn = document.createElement('button');
+      btn.id = 'load-older-btn';
+      btn.type = 'button';
+      btn.className = 'secondary';
+      btn.textContent = state.historyExhausted ? 'Start of conversation' : '⬆ Load older messages';
+      if (state.historyExhausted) {
+        btn.disabled = true;
+        btn.classList.add('exhausted');
+      } else {
+        btn.addEventListener('click', () => this.loadOlder());
+      }
+      this.btn = btn;
+      elements.messages.insertBefore(btn, elements.messages.firstChild);
+    },
+
+    loadOlder() {
+      if (state.historyLoading || state.historyExhausted) return;
+      if (!window.ChatAPI || typeof window.ChatAPI.getHistoryBefore !== 'function') return;
+      if (state.oldestTs === null) this.syncFromDom();
+      if (state.oldestTs === null) {
+        // Nothing on screen to page from (empty room).
+        state.historyExhausted = true;
+        this.mount();
+        return;
+      }
+
+      state.historyLoading = true;
+      const btn = this.btn;
+      if (btn) { btn.disabled = true; btn.textContent = 'Loading older messages…'; }
+
+      window.ChatAPI.getHistoryBefore(state.currentRoom, state.oldestTs, 50)
+        .then((rows) => {
+          const list = Array.isArray(rows) ? rows : [];
+          if (!list.length) {
+            state.historyExhausted = true;
+            state.historyLoading = false;
+            this.mount();
+            return;
+          }
+          // Prepend oldest-first so on-screen order stays chronological.
+          list.forEach((m) => messages.render(m, true, true));
+          this.noteOldest(list[0] && list[0].timestamp);
+          state.historyLoading = false;
+          // A short page means we reached the beginning.
+          if (list.length < 50) state.historyExhausted = true;
+          this.mount();
+        })
+        .catch(() => {
+          state.historyLoading = false;
+          this.mount();
+          showToast('Could not load older messages. Check your connection.', 'error');
+        });
     },
   };
 
@@ -1817,8 +1942,17 @@
     'history': (data) => {
       if (data.room !== state.currentRoom) return;
       if (elements.messages) elements.messages.innerHTML = '';
-      data.messages.forEach(msg => messages.render(msg));
+      scrollback.reset();
+      const batch = data.messages || [];
+      batch.forEach(msg => messages.render(msg));
       document.querySelectorAll('.msg').forEach(m => m.classList.toggle('me', isMineDataset(m)));
+      // Seed the scrollback cursor from the oldest message we just rendered.
+      if (batch.length) scrollback.noteOldest(batch[0] && batch[0].timestamp);
+      // A shorter-than-a-full-page initial load means the room has no older
+      // history, so offer no control (or a terminal one) rather than a button
+      // that would always return nothing.
+      if (batch.length < INITIAL_HISTORY_LIMIT) state.historyExhausted = true;
+      scrollback.mount();
     },
 
     'presence': (data) => {

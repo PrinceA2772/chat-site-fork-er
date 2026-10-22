@@ -390,7 +390,63 @@
       gap: 12px;
       align-items: flex-start;
     }
-    
+
+    /* ── Load older messages ─────────────────────────────────────────────
+       Sits at the top of the transcript. History loads in pages so joining a
+       room does not pull an entire room's backlog every time. */
+    #load-older-btn {
+      align-self: center;
+      margin: 0 auto 4px;
+      padding: 7px 16px;
+      font-size: 12.5px;
+      border-radius: 999px;
+      cursor: pointer;
+      background: var(--panel2);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      transition: background .15s ease, color .15s ease, border-color .15s ease;
+    }
+    #load-older-btn:hover:not(:disabled) {
+      background: var(--panel);
+      color: var(--text);
+      border-color: var(--border-light);
+    }
+    #load-older-btn:disabled,
+    #load-older-btn.exhausted {
+      cursor: default;
+      opacity: .6;
+      font-style: italic;
+    }
+    html.ptr29-light-theme #load-older-btn {
+      background: #eef2f7;
+      color: #3f4c60;
+      border-color: #dbe3ec;
+    }
+    html.ptr29-light-theme #load-older-btn:hover:not(:disabled) {
+      background: #e2e8f0;
+      color: #0b1526;
+    }
+    html.ptr29-halloween body.ptr29-halloween #load-older-btn {
+      background: rgba(40, 18, 68, .72);
+      color: #d3b8ef;
+      border-color: rgba(168, 85, 247, .30);
+    }
+    html.ptr29-halloween body.ptr29-halloween #load-older-btn:hover:not(:disabled) {
+      background: rgba(74, 30, 116, .84);
+      color: #f5ecff;
+      border-color: rgba(255, 138, 44, .50);
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #load-older-btn {
+      background: rgba(255, 250, 242, .92);
+      color: #6b4423;
+      border-color: rgba(154, 82, 12, .26);
+    }
+    html.ptr29-light-theme.ptr29-halloween body.ptr29-halloween #load-older-btn:hover:not(:disabled) {
+      background: rgba(255, 236, 214, .96);
+      color: #3d1f0a;
+      border-color: rgba(194, 104, 16, .46);
+    }
+
     .sys {
       color: #93c5fd;
       font-size: 12px;
