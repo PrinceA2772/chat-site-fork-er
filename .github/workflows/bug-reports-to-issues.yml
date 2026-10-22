@@ -12,14 +12,21 @@
 # is injected by GitHub at run time, is scoped to this repository, and expires
 # when the job ends — nothing secret is ever shipped to a browser.
 #
-# REQUIRED REPOSITORY SECRET
-#   SUPABASE_SERVICE_KEY — the Supabase service_role key for this project.
-#     Add it at: Settings → Secrets and variables → Actions → New repository
-#     secret. It is used ONLY here, server-side, to read the reports table.
-#     Never put it in Chatting_updated/public/**.
+# REQUIRED REPOSITORY SECRETS
+#   SUPABASE_SECRET_KEY — the Supabase secret key (sb_secret_...) for this
+#     project. Add it at: Settings → Secrets and variables → Actions → New
+#     repository secret. It is used ONLY here, server-side, to read the
+#     reports table. Never put it in Chatting_updated/public/**.
+#   SUPABASE_PUBLISHABLE_KEY — the publishable key (sb_publishable_...).
+#     New-format Supabase keys need the secret in Authorization and the
+#     publishable key in apikey; the workflow falls back to using the secret
+#     for both if this one is absent.
 #
-# Until that secret exists the workflow exits cleanly without failing, so it is
-# safe to merge before the secret is configured.
+#   Legacy projects may instead set SUPABASE_SERVICE_KEY (the service_role
+#   JWT); the workflow still accepts it.
+#
+# Until a key exists the workflow exits cleanly without failing, so it is safe
+# to merge before the secrets are configured.
 
 name: Mirror bug reports to issues
 
@@ -45,26 +52,54 @@ jobs:
       - name: Check the secret is configured
         id: guard
         env:
-          KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SECRET: ${{ secrets.SUPABASE_SECRET_KEY }}
+          LEGACY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          if [ -z "$KEY" ]; then
-            echo "::notice::SUPABASE_SERVICE_KEY is not set — skipping. Add it in Settings → Secrets and variables → Actions to enable report mirroring."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
+          # Accept either naming. New-format projects use a secret key
+          # (sb_secret_...) plus a publishable key; older ones use the legacy
+          # service_role JWT for both headers.
+          if [ -n "$SECRET" ]; then
+            echo "::notice::Using SUPABASE_SECRET_KEY (new-format secret key)."
             echo "skip=false" >> "$GITHUB_OUTPUT"
+          elif [ -n "$LEGACY" ]; then
+            echo "::notice::Using SUPABASE_SERVICE_KEY (legacy service_role JWT)."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::No Supabase key configured — skipping. Add SUPABASE_SECRET_KEY (and SUPABASE_PUBLISHABLE_KEY) in Settings → Secrets and variables → Actions."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Fetch new reports
         if: steps.guard.outputs.skip == 'false'
         env:
           SUPABASE_URL: https://vjrnabnawhegjdsvbyrc.supabase.co
-          KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SECRET: ${{ secrets.SUPABASE_SECRET_KEY }}
+          PUBLISHABLE: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          LEGACY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           set -euo pipefail
+          # New-format keys: secret goes in Authorization, publishable in apikey.
+          # Legacy service_role JWT: the same value is valid in both headers, so
+          # fall back to it when no new-format keys are configured.
+          if [ -n "$SECRET" ]; then
+            APIKEY="${PUBLISHABLE:-$SECRET}"
+            AUTH="$SECRET"
+          else
+            APIKEY="$LEGACY"
+            AUTH="$LEGACY"
+          fi
+          # Do NOT echo the keys. Only report which mode is in use.
+          if [ -n "$SECRET" ] && [ -n "$PUBLISHABLE" ]; then
+            echo "auth mode: new-format (secret + publishable)"
+          elif [ -n "$SECRET" ]; then
+            echo "auth mode: new-format (secret only — if this 401s, add SUPABASE_PUBLISHABLE_KEY)"
+          else
+            echo "auth mode: legacy service_role"
+          fi
           # status=new and not yet mirrored (issue_number is null)
           curl -sS --fail \
-            -H "apikey: $KEY" \
-            -H "Authorization: Bearer $KEY" \
+            -H "apikey: $APIKEY" \
+            -H "Authorization: Bearer $AUTH" \
             -H "Accept: application/json" \
             "$SUPABASE_URL/rest/v1/bug_reports?select=id,kind,title,details,steps,severity,page_url,user_agent,viewport,theme,build,reporter_name,contact,created_at&status=eq.new&issue_number=is.null&order=created_at.asc&limit=20" \
             -o reports.json
@@ -77,9 +112,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SUPABASE_URL: https://vjrnabnawhegjdsvbyrc.supabase.co
-          KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SECRET: ${{ secrets.SUPABASE_SECRET_KEY }}
+          PUBLISHABLE: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          LEGACY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           set -euo pipefail
+          if [ -n "$SECRET" ]; then
+            APIKEY="${PUBLISHABLE:-$SECRET}"
+            AUTH="$SECRET"
+          else
+            APIKEY="$LEGACY"
+            AUTH="$LEGACY"
+          fi
           if [ ! -s reports.ndjson ]; then
             echo "nothing to mirror"
             exit 0
@@ -163,8 +207,8 @@ jobs:
 
             # Mark mirrored so the next run can't reopen a duplicate.
             curl -sS --fail -X PATCH \
-              -H "apikey: $KEY" \
-              -H "Authorization: Bearer $KEY" \
+              -H "apikey: $APIKEY" \
+              -H "Authorization: Bearer $AUTH" \
               -H "Content-Type: application/json" \
               -H "Prefer: return=minimal" \
               "$SUPABASE_URL/rest/v1/bug_reports?id=eq.$id" \
