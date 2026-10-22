@@ -36,6 +36,14 @@
     return base;
   }
 
+  function advisoryHref() {
+    // Sensitive reports must NOT go through the public issue tracker and
+    // SECURITY.md lives in the repo root, so it is never served by Pages —
+    // linking it here would 404. GitHub's private advisory form is the
+    // intended destination and matches what the issue templates tell people.
+    return 'https://github.com/gamer-09/chat-site/security/advisories/new';
+  }
+
   function build() {
     var overlay = document.createElement('div');
     overlay.id = 'bug-report-modal';
@@ -109,8 +117,8 @@
 
         '<p class="bug-report-foot">Prefer GitHub? ' +
           '<a href="' + reportHref() + '" target="_blank" rel="noopener noreferrer">Open an issue directly</a>. ' +
-          'See the <a href="SECURITY.md" target="_blank" rel="noopener noreferrer">security policy</a> ' +
-          'for anything sensitive — please don\'t put vulnerabilities in a public report.</p>' +
+          'For anything sensitive, use <a href="' + advisoryHref() + '" target="_blank" rel="noopener noreferrer">private ' +
+          'vulnerability reporting</a> instead — please don\'t put vulnerabilities in a public report.</p>' +
       '</div>';
 
     document.body.appendChild(overlay);
