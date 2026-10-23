@@ -73,13 +73,49 @@ const MAX_LINK_LENGTH = parseInt(process.env.MAX_LINK_LENGTH || '2048', 10);
 const BLOCKED_LINK_EXT = new Set(['exe', 'msi', 'apk', 'ipa', 'dmg', 'pkg', 'bat', 'cmd', 'sh', 'ps1', 'vbs', 'scr', 'jar', 'js', 'mjs', 'wasm']);
 const apiLimiter = createRateLimiter({ windowMs: 60 * 1000, limit: 180 });
 const uploadLimiter = createRateLimiter({ windowMs: 60 * 1000, limit: 20 });
+const strictLimiter = createRateLimiter({ windowMs: 60 * 1000, limit: 60 });
+const strictLimiter = createRateLimiter({ windowMs: 60 * 1000, limit: 60 });
 
 const app = express();
 app.disable('x-powered-by');
+
+// Global error handler and logging
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err && err.stack ? err.stack : err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[unhandledRejection]', reason && reason.stack ? reason.stack : reason);
+});
+
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : ms > 1000 ? 'slow' : 'info';
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    if (process.env.NODE_ENV === 'production') {
+      if (level === 'error' || level === 'slow') {
+        console.log(`[${level}] ${req.method} ${req.path} ${res.statusCode} ${ms}ms ip=${ip}`);
+      }
+    } else if (level === 'error' || level === 'slow') {
+      console.log(`[${level}] ${req.method} ${req.path} ${res.statusCode} ${ms}ms ip=${ip}`);
+    }
+  });
+  next();
+});
 app.use(securityHeaders);
 app.use(corsGuard);
 app.use(express.json({ limit: MAX_JSON_BYTES }));
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('[express-error]', err && err.stack ? err.stack : err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: 'internal_server_error' });
+});
 app.use('/api/', apiLimiter);
+app.use('/api/admins/', strictLimiter);
+app.use('/api/clear-all', strictLimiter);
 app.use(express.static(path.join(__dirname, 'public'), { fallthrough: true, setHeaders: securityStaticHeaders }));
 
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
@@ -114,23 +150,39 @@ function securityStaticHeaders(res) {
 }
 function createRateLimiter({ windowMs, limit }) {
   const hits = new Map();
-  setInterval(() => {
+  const cleanup = setInterval(() => {
     const now = Date.now();
-    for (const [key, bucket] of hits.entries()) if (bucket.reset <= now) hits.delete(key);
-  }, Math.min(windowMs, 60 * 1000)).unref?.();
+    for (const [key, bucket] of hits.entries()) {
+      if (!bucket || bucket.reset <= now) hits.delete(key);
+    }
+  }, Math.min(windowMs, 60 * 1000));
+  if (typeof cleanup.unref === 'function') cleanup.unref();
   return (req, res, next) => {
-    const ip = req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : req.socket.remoteAddress;
-    const key = `${ip}:${req.method}:${req.path}`;
-    const now = Date.now();
-    const bucket = hits.get(key) || { count: 0, reset: now + windowMs };
-    if (bucket.reset <= now) { bucket.count = 0; bucket.reset = now + windowMs; }
-    bucket.count += 1;
-    hits.set(key, bucket);
-    res.setHeader('RateLimit-Limit', String(limit));
-    res.setHeader('RateLimit-Remaining', String(Math.max(0, limit - bucket.count)));
-    res.setHeader('RateLimit-Reset', String(Math.ceil(bucket.reset / 1000)));
-    if (bucket.count > limit) return res.status(429).json({ error: 'rate_limited' });
-    next();
+    try {
+      const forwarded = req.headers['x-forwarded-for'];
+      let ip = forwarded ? String(forwarded).split(',')[0].trim() : (req.ip || req.socket.remoteAddress || 'unknown');
+      // Basic IP normalization
+      if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+      const key = `${ip}:${req.method}:${req.path}`;
+      const now = Date.now();
+      let bucket = hits.get(key);
+      if (!bucket || bucket.reset <= now) {
+        bucket = { count: 0, reset: now + windowMs };
+      }
+      bucket.count += 1;
+      hits.set(key, bucket);
+      const remaining = Math.max(0, limit - bucket.count);
+      res.setHeader('RateLimit-Limit', String(limit));
+      res.setHeader('RateLimit-Remaining', String(remaining));
+      res.setHeader('RateLimit-Reset', String(Math.ceil(bucket.reset / 1000)));
+      res.setHeader('X-RateLimit-Limit', String(limit));
+      res.setHeader('X-RateLimit-Remaining', String(remaining));
+      res.setHeader('X-RateLimit-Reset', String(Math.ceil(bucket.reset / 1000)));
+      if (bucket.count > limit) return res.status(429).json({ error: 'rate_limited', retryAfter: Math.ceil((bucket.reset - now) / 1000) });
+      next();
+    } catch (e) {
+      next();
+    }
   };
 }
 function isOriginAllowed(origin, host) {
@@ -164,9 +216,14 @@ function requireAdminToken(req, res, next) {
   const auth = String(req.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
   const header = String(req.get('X-Admin-Token') || '').trim();
   const candidate = auth || header;
-  const a = Buffer.from(candidate);
-  const b = Buffer.from(ADMIN_TOKEN);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return res.status(403).json({ error: 'forbidden' });
+  if (!candidate) return res.status(403).json({ error: 'forbidden' });
+  try {
+    const a = Buffer.from(candidate);
+    const b = Buffer.from(ADMIN_TOKEN);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return res.status(403).json({ error: 'forbidden' });
+  } catch (e) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
   next();
 }
 function cleanFileBase(name, fallback) {
@@ -327,7 +384,45 @@ app.get('/favicon.ico', (req, res) => {
   res.type('image/png').send(Buffer.from(b64, 'base64'));
 });
 
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/health', (req, res) => {
+  try {
+    const rooms = getRooms ? getRooms() : [];
+    const users = getAllUsers ? getAllUsers() : [];
+    const mem = process.memoryUsage ? process.memoryUsage() : {};
+    res.json({ 
+      status: 'ok', 
+      uptime: Math.floor(process.uptime()),
+      rooms: Array.isArray(rooms) ? rooms.length : 0,
+      users: Array.isArray(users) ? users.length : 0,
+      memory: {
+        rss: mem.rss,
+        heapUsed: mem.heapUsed,
+        heapTotal: mem.heapTotal
+      },
+      node: process.version,
+      pid: process.pid,
+      timestamp: new Date().toISOString()
+    });
+  } catch (e) {
+    res.status(500).json({ status: 'error', error: 'health_check_failed' });
+  }
+});
+
+app.get('/api/health', (req, res) => {
+  try {
+    const rooms = getRooms ? getRooms() : [];
+    const users = getAllUsers ? getAllUsers() : [];
+    res.json({ 
+      status: 'ok', 
+      uptime: Math.floor(process.uptime()),
+      rooms: Array.isArray(rooms) ? rooms.length : 0,
+      users: Array.isArray(users) ? users.length : 0,
+      timestamp: new Date().toISOString()
+    });
+  } catch (e) {
+    res.status(500).json({ status: 'error', error: 'health_check_failed' });
+  }
+});
 
 // ── REST: rooms ──────────────────────────────────────────────────────────────
 app.get('/api/rooms', (req, res) => {
