@@ -63,36 +63,36 @@
       '<div class="modal bug-report-card">' +
         '<button class="help-close" id="bug-report-close" type="button" aria-label="Close">×</button>' +
         '<h3 id="bug-report-title">🐞 Report a problem</h3>' +
-        '<p class="bug-report-lead">Fields marked <strong class="req">*</strong> are required. ' +
-          'The more specific you are, the faster I can fix it. No account needed. ' +
-          'Please don\'t include passwords or personal details.</p>' +
+        '<p class="bug-report-lead"><strong>All fields marked <span class="req">*</span> are required.</strong> ' +
+          'Include steps to reproduce and expected vs actual behavior so it can be fixed quickly. ' +
+          'No account needed — don\'t include passwords or personal details.</p>' +
 
         '<form id="bug-report-form" novalidate>' +
           '<label class="bug-field">' +
-            '<span>What kind of problem is it? <strong class="req">*</strong></span>' +
+            '<span>Category <strong class="req">*</strong> <em>Pick the closest match</em></span>' +
             '<select id="bug-kind" name="kind" required>' + kindOpts + '</select>' +
           '</label>' +
 
           '<label class="bug-field">' +
-            '<span>Short summary <strong class="req">*</strong> <em id="bug-title-count">0/160</em></span>' +
+            '<span>Short summary (one line) <strong class="req">*</strong> <em id="bug-title-count">0/160</em></span>' +
             '<input id="bug-title" name="title" type="text" maxlength="160" ' +
-              'placeholder="e.g. Messages vanish after switching rooms" autocomplete="off" required>' +
+              'placeholder="e.g. Clicking Send duplicates messages in #general" autocomplete="off" required>' +
           '</label>' +
 
           '<label class="bug-field">' +
-            '<span>What happened? <strong class="req">*</strong> <em id="bug-details-count">0/6000</em></span>' +
+            '<span>Expected vs actual <strong class="req">*</strong> <em id="bug-details-count">0/6000</em></span>' +
             '<textarea id="bug-details" name="details" rows="5" maxlength="6000" ' +
-              'placeholder="What you were doing&#10;What you expected to happen&#10;What actually happened&#10;" required></textarea>' +
+              'placeholder="I was doing...&#10;I expected...&#10;Instead, this happened..." required></textarea>' +
           '</label>' +
 
           '<label class="bug-field">' +
-            '<span>Steps to reproduce <strong class="req">*</strong></span>' +
-            '<textarea id="bug-steps" name="steps" rows="3" maxlength="3000" ' +
-              'placeholder="1. Open room…&#10;2. Tap…&#10;3. See…" required></textarea>' +
+            '<span>Steps to reproduce (exactly) <strong class="req">*</strong></span>' +
+            '<textarea id="bug-steps" name="steps" rows="4" maxlength="3000" ' +
+              'placeholder="1. Go to #room-name&#10;2. Click/tap ...&#10;3. Do ...&#10;Result: ..." required></textarea>' +
           '</label>' +
 
           '<label class="bug-field">' +
-            '<span>How much does it get in the way? <strong class="req">*</strong></span>' +
+            '<span>Impact / severity <strong class="req">*</strong> <em>Pick how bad it is</em></span>' +
             '<select id="bug-severity" name="severity" required>' + sevOpts + '</select>' +
           '</label>' +
 
@@ -209,9 +209,9 @@
     var severity = overlay.querySelector('#bug-severity').value;
     var sendBtn = overlay.querySelector('#bug-report-send');
 
-    if (title.length < 3) { setStatus('Please add a short summary (at least 3 characters).', 'error'); return; }
-    if (details.length < 10) { setStatus('Please describe what happened (at least 10 characters).', 'error'); return; }
-    if (steps.length < 5) { setStatus('Please add steps to reproduce (at least 5 characters).', 'error'); return; }
+    if (title.length < 3) { setStatus('Add a short one-line summary (at least 3 characters).', 'error'); return; }
+    if (details.length < 10) { setStatus('Describe expected vs actual (at least 10 characters).', 'error'); return; }
+    if (steps.length < 10) { setStatus('Add clear steps to reproduce (include actions in order).', 'error'); return; }
 
     if (Date.now() - lastSent < COOLDOWN_MS) {
       var wait = Math.ceil((COOLDOWN_MS - (Date.now() - lastSent)) / 1000);
