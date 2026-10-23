@@ -63,37 +63,37 @@
       '<div class="modal bug-report-card">' +
         '<button class="help-close" id="bug-report-close" type="button" aria-label="Close">×</button>' +
         '<h3 id="bug-report-title">🐞 Report a problem</h3>' +
-        '<p class="bug-report-lead">Tell me what went wrong and it lands straight in this ' +
-          'project\'s issue tracker. No account needed. Please don\'t include passwords or ' +
-          'personal details.</p>' +
+        '<p class="bug-report-lead">Fields marked <strong class="req">*</strong> are required. ' +
+          'The more specific you are, the faster I can fix it. No account needed. ' +
+          'Please don\'t include passwords or personal details.</p>' +
 
         '<form id="bug-report-form" novalidate>' +
           '<label class="bug-field">' +
-            '<span>What kind of problem is it?</span>' +
-            '<select id="bug-kind" name="kind">' + kindOpts + '</select>' +
+            '<span>What kind of problem is it? <strong class="req">*</strong></span>' +
+            '<select id="bug-kind" name="kind" required>' + kindOpts + '</select>' +
           '</label>' +
 
           '<label class="bug-field">' +
-            '<span>Short summary <em id="bug-title-count">0/160</em></span>' +
+            '<span>Short summary <strong class="req">*</strong> <em id="bug-title-count">0/160</em></span>' +
             '<input id="bug-title" name="title" type="text" maxlength="160" ' +
               'placeholder="e.g. Messages vanish after switching rooms" autocomplete="off" required>' +
           '</label>' +
 
           '<label class="bug-field">' +
-            '<span>What happened? <em id="bug-details-count">0/6000</em></span>' +
+            '<span>What happened? <strong class="req">*</strong> <em id="bug-details-count">0/6000</em></span>' +
             '<textarea id="bug-details" name="details" rows="5" maxlength="6000" ' +
-              'placeholder="What you did, what you expected, and what actually happened." required></textarea>' +
+              'placeholder="What you were doing&#10;What you expected to happen&#10;What actually happened&#10;" required></textarea>' +
           '</label>' +
 
           '<label class="bug-field">' +
-            '<span>Steps to reproduce <em>optional</em></span>' +
+            '<span>Steps to reproduce <strong class="req">*</strong></span>' +
             '<textarea id="bug-steps" name="steps" rows="3" maxlength="3000" ' +
-              'placeholder="1. Open room…&#10;2. Tap…&#10;3. See…"></textarea>' +
+              'placeholder="1. Open room…&#10;2. Tap…&#10;3. See…" required></textarea>' +
           '</label>' +
 
           '<label class="bug-field">' +
-            '<span>How much does it get in the way?</span>' +
-            '<select id="bug-severity" name="severity">' + sevOpts + '</select>' +
+            '<span>How much does it get in the way? <strong class="req">*</strong></span>' +
+            '<select id="bug-severity" name="severity" required>' + sevOpts + '</select>' +
           '</label>' +
 
           '<label class="bug-field">' +
@@ -211,6 +211,7 @@
 
     if (title.length < 3) { setStatus('Please add a short summary (at least 3 characters).', 'error'); return; }
     if (details.length < 10) { setStatus('Please describe what happened (at least 10 characters).', 'error'); return; }
+    if (steps.length < 5) { setStatus('Please add steps to reproduce (at least 5 characters).', 'error'); return; }
 
     if (Date.now() - lastSent < COOLDOWN_MS) {
       var wait = Math.ceil((COOLDOWN_MS - (Date.now() - lastSent)) / 1000);
