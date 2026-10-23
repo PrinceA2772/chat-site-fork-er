@@ -49,7 +49,7 @@ try { pruneAdminsToUsernames(['gg_games']); } catch {}
 const MAX_IMAGE_BYTES = parseInt(process.env.MAX_IMAGE_BYTES || String(5 * 1024 * 1024), 10);
 const MAX_FILE_BYTES = parseInt(process.env.MAX_FILE_BYTES || String(10 * 1024 * 1024), 10);
 const MAX_JSON_BYTES = parseInt(process.env.MAX_JSON_BYTES || String(16 * 1024 * 1024), 10);
-const ADMIN_TOKEN = String(process.env.ADMIN_TOKEN || '').trim();
+const ADMIN_TOKEN = ''; // Admin API removed
 const ALLOWED_ORIGINS = String(process.env.ALLOWED_ORIGINS || '')
   .split(',').map(s => s.trim()).filter(Boolean);
 const ALLOWED_IMAGE_MIME = new Map([
@@ -73,8 +73,6 @@ const MAX_LINK_LENGTH = parseInt(process.env.MAX_LINK_LENGTH || '2048', 10);
 const BLOCKED_LINK_EXT = new Set(['exe', 'msi', 'apk', 'ipa', 'dmg', 'pkg', 'bat', 'cmd', 'sh', 'ps1', 'vbs', 'scr', 'jar', 'js', 'mjs', 'wasm']);
 const apiLimiter = createRateLimiter({ windowMs: 60 * 1000, limit: 180 });
 const uploadLimiter = createRateLimiter({ windowMs: 60 * 1000, limit: 20 });
-const strictLimiter = createRateLimiter({ windowMs: 60 * 1000, limit: 60 });
-const strictLimiter = createRateLimiter({ windowMs: 60 * 1000, limit: 60 });
 
 const app = express();
 app.disable('x-powered-by');
@@ -212,19 +210,7 @@ function corsGuard(req, res, next) {
   next();
 }
 function requireAdminToken(req, res, next) {
-  if (!ADMIN_TOKEN) return res.status(404).json({ error: 'not_found' });
-  const auth = String(req.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
-  const header = String(req.get('X-Admin-Token') || '').trim();
-  const candidate = auth || header;
-  if (!candidate) return res.status(403).json({ error: 'forbidden' });
-  try {
-    const a = Buffer.from(candidate);
-    const b = Buffer.from(ADMIN_TOKEN);
-    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return res.status(403).json({ error: 'forbidden' });
-  } catch (e) {
-    return res.status(403).json({ error: 'forbidden' });
-  }
-  next();
+  return res.status(404).json({ error: 'not_found' });
 }
 function cleanFileBase(name, fallback) {
   return String(name || fallback || 'file').toLowerCase().replace(/\.[^/.]+$/, '').replace(/[^a-z0-9_-]/g, '').slice(0, 30) || fallback || 'file';
@@ -572,12 +558,6 @@ app.post('/api/rooms/:room/clear', (req, res) => {
   return res.json({ ok: true, room });
 });
 
-app.post('/api/clear-all', requireAdminToken, (req, res) => {
-  clearAll();
-  broadcastRooms();
-  return res.json({ ok: true });
-});
-
 app.post('/api/rooms/:room/delete', (req, res) => {
   const room = sanitizeRoomName(req.params.room) || DEFAULT_ROOM;
   if (room === DEFAULT_ROOM) return res.status(400).json({ error: 'Cannot delete default room' });
@@ -634,13 +614,6 @@ app.get('/api/users/check-username', (req, res) => {
   return res.json({ available: !taken, username: raw });
 });
 
-app.post('/api/admins/prune', requireAdminToken, (req, res) => {
-  const names = Array.isArray((req.body || {}).usernames) ? req.body.usernames : ['gg_games'];
-  const result = pruneAdminsToUsernames(names);
-  broadcastRooms();
-  return res.json({ ok: true, ...result, usernames: names });
-});
-
 // ── REST: search ──────────────────────────────────────────────────────────────
 app.get('/api/rooms/:room/search', (req, res) => {
   const room = sanitizeRoomName(req.params.room) || DEFAULT_ROOM;
@@ -670,10 +643,7 @@ const io = new Server(server, {
   allowRequest: (req, cb) => cb(null, isOriginAllowed(req.headers.origin, req.headers.host))
 });
 
-app.post('/admin/shutdown', requireAdminToken, (req, res) => {
-  res.json({ ok: true });
-  setTimeout(() => { try { server.close(() => process.exit(0)); } catch { process.exit(0); } }, 50);
-});
+
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function sanitizeRoomName(input) {
