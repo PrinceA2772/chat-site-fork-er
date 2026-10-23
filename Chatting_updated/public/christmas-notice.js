@@ -1,1 +1,99 @@
-(function(){"use strict";if(document.getElementById("xmas-notice"))return;function openNotice(){if(document.getElementById("xmas-notice"))return;var ov=document.createElement("div");ov.id="xmas-notice";ov.className="modal-overlay";ov.setAttribute("role","dialog");ov.setAttribute("aria-modal","true");ov.setAttribute("aria-labelledby","xmas-notice-title");ov.innerHTML="<div class=\"modal xmas-notice-card\"><div class=\"xmas-notice-glow\" aria-hidden=\"true\"></div><button class=\"help-close\" id=\"xmas-notice-close\" type=\"button\" aria-label=\"Close\">×</button><div class=\"xmas-notice-emoji\" aria-hidden=\"true\">🎄</div><h3 id=\"xmas-notice-title\">Merry Christmas! (TEST PREVIEW)</h3><p><strong>TEST PREVIEW</strong> — Always shows on refresh. No month or date restriction. Will be removed when made official.</p><ul class=\"xmas-notice-list\"><li>🎄 <strong>Header 🎄</strong> toggles the theme</li><li>❄️ <strong>3D scene</strong> (snow, aurora, village, tree, sleighs)</li><li>🧪 <strong>Refresh</strong> to see again</li></ul><div class=\"xmas-notice-actions\"><button id=\"xmas-notice-ok\" type=\"button\">Got it (test)</button></div></div>";document.body.appendChild(ov);function dismiss(){if(ov.classList.contains("closing"))return;ov.classList.add("closing");ov.classList.remove("open");setTimeout(function(){if(ov.parentNode)ov.parentNode.removeChild(ov);},200);}var c=document.getElementById("xmas-notice-close"),b=document.getElementById("xmas-notice-ok");if(c)c.onclick=dismiss;if(b)b.onclick=dismiss;ov.onclick=function(e){if(e.target===ov)dismiss();};var kd=function(e){if(e.key==="Escape"){document.removeEventListener("keydown",kd);dismiss();}};document.addEventListener("keydown",kd);requestAnimationFrame(function(){ov.classList.add("open");});}function check(){var ag=document.getElementById("ag-overlay")||document.getElementById("ag-age-overlay")||document.getElementById("ag-terms-overlay");if(ag){setTimeout(check,300);return;}openNotice();}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",check,{once:true});else check();})();
+/**
+ * christmas-notice.js — one-time "Christmas update" popup for ptr_29 Chat.
+ *
+ * Loads AFTER client.js so it can reuse the site's modal styling and showToast.
+ * Shows exactly once per device per season, then never again: the dismissal is
+ * remembered in localStorage under a year-scoped key, so next December it comes
+ * back with the theme.
+ *
+ * Season gating mirrors christmas.js: December only, every year. Keep
+ * SEASON_MONTH / SEASON_YEAR in step with that file.
+ */
+(function () {
+  'use strict';
+
+  var SEASON_MONTH = 11;    // December (zero-based)
+  var SEASON_YEAR = null;   // null = every December; set a year to pin it
+  var SEEN_KEY = 'ptr29_christmas_notice_v1';   // suffixed with the season year
+  var DELAY_MS = 1400;      // let the room list settle before interrupting
+
+  var today = new Date();
+  if (today.getMonth() !== SEASON_MONTH) return;
+  if (SEASON_YEAR !== null && today.getFullYear() !== SEASON_YEAR) return;
+
+  var key = SEEN_KEY + ':' + today.getFullYear();
+  try { if (localStorage.getItem(key) === '1') return; } catch (e) {}
+
+  function gateOpen() {
+    if (document.getElementById('ag-overlay')) return true;
+    if (document.getElementById('ag-age-overlay')) return true;
+    if (document.getElementById('ag-terms-overlay')) return true;
+    var open = document.querySelector('.modal-overlay.open');
+    return !!open;
+  }
+
+  function build() {
+    var overlay = document.createElement('div');
+    overlay.id = 'xmas-notice';
+    overlay.className = 'modal-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'xmas-notice-title');
+
+    overlay.innerHTML =
+      '<div class="modal xmas-notice-card">' +
+        '<div class="xmas-notice-glow" aria-hidden="true"></div>' +
+        '<button class="help-close" id="xmas-notice-close" type="button" aria-label="Close">×</button>' +
+        '<div class="xmas-notice-emoji" aria-hidden="true">🎄</div>' +
+        '<h3 id="xmas-notice-title">Merry Christmas! 🎄</h3>' +
+        '<p>ptr_29 Chat has gone <strong>merry and bright</strong> — a brand-new ' +
+          '<strong>3D live-motion</strong> Christmas theme and backdrop, here for December only.</p>' +
+        '<ul class="xmas-notice-list">' +
+          '<li>❄️ <strong>Live 3D scene</strong> behind the chat — falling snow, aurora ribbons and a snowy village that follows your cursor</li>' +
+          '<li>🛷 <strong>Sleighs, fairy lights &amp; a lit tree</strong> drifting over the winter hills</li>' +
+          '<li>🎄 <strong>Tap the 🎄 in the header</strong> any time to switch it off (it comes back next December unless you turn it off again)</li>' +
+          '<li>⏸ <strong>Keep it calm</strong> — the existing motion toggle still freezes every animation</li>' +
+        '</ul>' +
+        '<div class="xmas-notice-actions">' +
+          '<button id="xmas-notice-ok" type="button">🎄 Enjoy the season</button>' +
+        '</div>' +
+      '<p class="xmas-notice-foot">Made for the community — thank you for chatting here. ❄️</p>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+
+  function open() {
+    var overlay = build();
+    var dismissed = false;
+
+    function dismiss() {
+      if (dismissed) return;
+      dismissed = true;
+      try { localStorage.setItem(key, '1'); } catch (e) {}
+      overlay.classList.remove('open');
+      setTimeout(function () { overlay.remove(); }, 260);
+    }
+
+    overlay.querySelector('#xmas-notice-close').addEventListener('click', dismiss);
+    overlay.querySelector('#xmas-notice-ok').addEventListener('click', dismiss);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) dismiss(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') dismiss();
+    });
+
+    requestAnimationFrame(function () { if (overlay) overlay.classList.add('open'); });
+  }
+
+  var waited = 0;
+  var timer = setInterval(function () {
+    waited += 500;
+    if (!gateOpen() && document.body) {
+      clearInterval(timer);
+      setTimeout(open, DELAY_MS);
+    } else if (waited > 120000) {
+      clearInterval(timer);
+    }
+  }, 500);
+})();
