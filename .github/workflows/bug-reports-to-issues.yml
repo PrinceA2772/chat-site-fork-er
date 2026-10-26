@@ -17,13 +17,15 @@
 #     project. Add it at: Settings → Secrets and variables → Actions → New
 #     repository secret. It is used ONLY here, server-side, to read the
 #     reports table. Never put it in Chatting_updated/public/**.
-#   SUPABASE_PUBLISHABLE_KEY — the publishable key (sb_publishable_...).
-#     New-format Supabase keys need the secret in Authorization and the
-#     publishable key in apikey; the workflow falls back to using the secret
-#     for both if this one is absent.
 #
 #   Legacy projects may instead set SUPABASE_SERVICE_KEY (the service_role
 #   JWT); the workflow still accepts it.
+#
+#   The publishable key (sb_publishable_...) is NOT used here. It is for the
+#   browser only; server-side requests authenticate with the secret key alone.
+#   Do not put a secret key in Authorization alongside a publishable apikey —
+#   PostgREST rejects that combination with 401 PGRST301 because the new
+#   secret keys are not JWTs ("Expected 3 parts in JWT; got 1").
 #
 # Until a key exists the workflow exits cleanly without failing, so it is safe
 # to merge before the secrets are configured.
@@ -65,7 +67,7 @@ jobs:
             echo "::notice::Using SUPABASE_SERVICE_KEY (legacy service_role JWT)."
             echo "skip=false" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::No Supabase key configured — skipping. Add SUPABASE_SECRET_KEY (and SUPABASE_PUBLISHABLE_KEY) in Settings → Secrets and variables → Actions."
+            echo "::notice::No Supabase key configured — skipping. Add SUPABASE_SECRET_KEY in Settings → Secrets and variables → Actions."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -74,38 +76,45 @@ jobs:
         env:
           SUPABASE_URL: https://vjrnabnawhegjdsvbyrc.supabase.co
           SECRET: ${{ secrets.SUPABASE_SECRET_KEY }}
-          PUBLISHABLE: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           LEGACY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           set -euo pipefail
-          # New-format keys: secret goes in Authorization, publishable in apikey.
-          # Legacy service_role JWT: the same value is valid in both headers, so
-          # fall back to it when no new-format keys are configured.
+          # Server-side requests authenticate with the SECRET key in BOTH
+          # headers. Supabase's new sb_secret_... keys are opaque strings, not
+          # JWTs: putting one in Authorization while a publishable key sits in
+          # apikey makes PostgREST answer 401 "Expected 3 parts in JWT; got 1".
+          # The publishable key is for browsers only and is not needed here.
+          # A legacy service_role JWT is likewise valid in both headers.
           if [ -n "$SECRET" ]; then
-            APIKEY="${PUBLISHABLE:-$SECRET}"
+            APIKEY="$SECRET"
             AUTH="$SECRET"
+            echo "auth mode: SUPABASE_SECRET_KEY"
           else
             APIKEY="$LEGACY"
             AUTH="$LEGACY"
+            echo "auth mode: SUPABASE_SERVICE_KEY (legacy)"
           fi
-          # Do NOT echo the keys. Only report which mode is in use.
-          if [ -n "$SECRET" ] && [ -n "$PUBLISHABLE" ]; then
-            echo "auth mode: new-format (secret + publishable)"
-          elif [ -n "$SECRET" ]; then
-            echo "auth mode: new-format (secret only — if this 401s, add SUPABASE_PUBLISHABLE_KEY)"
-          else
-            echo "auth mode: legacy service_role"
-          fi
+          # Do NOT echo the key itself.
           # status=new and not yet mirrored (issue_number is null)
-          curl -sS --fail \
+          http=$(curl -sS \
             -H "apikey: $APIKEY" \
             -H "Authorization: Bearer $AUTH" \
             -H "Accept: application/json" \
-            "$SUPABASE_URL/rest/v1/bug_reports?select=id,kind,title,details,steps,severity,page_url,user_agent,viewport,theme,build,reporter_name,contact,created_at&status=eq.new&issue_number=is.null&order=created_at.asc&limit=20" \
-            -o reports.json
+            -o reports.json -w '%{http_code}' \
+            "$SUPABASE_URL/rest/v1/bug_reports?select=id,kind,title,details,steps,severity,page_url,user_agent,viewport,theme,build,reporter_name,contact,created_at&status=eq.new&issue_number=is.null&order=created_at.asc&limit=20")
+          if [ "$http" != "200" ]; then
+            echo "::error::Supabase returned HTTP $http while fetching bug reports."
+            # PostgREST error bodies never echo the API key; show them so the
+            # failure is diagnosable instead of a bare curl exit code.
+            head -c 2000 reports.json || true
+            echo
+            exit 1
+          fi
           echo "reports found: $(jq 'length' reports.json)"
           jq -c '.[]' reports.json > reports.ndjson || true
-          cat reports.ndjson
+          # Log ids only: report bodies can contain personal data and workflow
+          # logs are public in a public repository.
+          jq -r '.[] | "pending report: \(.id) [\(.severity)] \(.kind)"' reports.json || true
 
       - name: Open an issue per report
         if: steps.guard.outputs.skip == 'false'
@@ -113,12 +122,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SUPABASE_URL: https://vjrnabnawhegjdsvbyrc.supabase.co
           SECRET: ${{ secrets.SUPABASE_SECRET_KEY }}
-          PUBLISHABLE: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           LEGACY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           set -euo pipefail
           if [ -n "$SECRET" ]; then
-            APIKEY="${PUBLISHABLE:-$SECRET}"
+            APIKEY="$SECRET"
             AUTH="$SECRET"
           else
             APIKEY="$LEGACY"
