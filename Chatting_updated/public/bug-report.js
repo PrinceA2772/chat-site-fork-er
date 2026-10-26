@@ -139,14 +139,30 @@
   }
 
   var overlay = null;
+  var returnFocus = null;
 
   function close() {
     if (!overlay) return;
     overlay.classList.remove('open');
     var n = overlay;
     overlay = null;
+    var target = returnFocus;
+    returnFocus = null;
+    if (target && document.contains(target) && typeof target.focus === 'function') {
+      try { target.focus(); } catch (e) {}
+    }
     setTimeout(function () { if (n) n.remove(); }, 260);
   }
+
+  // Registered once at load: adding this per open() would leave a new
+  // document-level listener behind on every reopen. Escape is handled here
+  // (rather than relying on the generic modal handler) so closing the reporter
+  // also restores focus and tears the overlay down.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !overlay) return;
+    e.preventDefault();
+    close();
+  });
 
   function setStatus(msg, type) {
     var s = overlay && overlay.querySelector('#bug-report-status');
@@ -157,8 +173,10 @@
     s.textContent = msg;
   }
 
-  function open() {
+  function open(fromEl) {
     if (overlay) return;
+    // Remember where focus was so Escape/close returns the user there.
+    returnFocus = (fromEl && typeof fromEl.focus === 'function') ? fromEl : document.activeElement;
     overlay = build();
 
     var meta = buildMeta();
@@ -186,9 +204,6 @@
     overlay.querySelector('#bug-report-close').addEventListener('click', close);
     overlay.querySelector('#bug-report-cancel').addEventListener('click', close);
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && overlay) close();
-    });
 
     overlay.querySelector('#bug-report-form').addEventListener('submit', submit);
 
@@ -254,6 +269,9 @@
         setStatus('That\'s a few reports in a short time — please try again in an hour.', 'error');
       } else if (code === 'title_too_short' || code === 'details_too_short') {
         setStatus('Please add a bit more detail before sending.', 'error');
+      } else if (code === 'request_failed' || code === 'network') {
+        setStatus('Could not reach the report service. Please try again shortly, ' +
+          'or use the GitHub link below.', 'error');
       } else if (code && /function|does not exist|schema cache/i.test(code)) {
         setStatus('Reporting isn\'t set up on this deployment yet. Please use the GitHub link below.', 'error');
       } else {
@@ -279,7 +297,7 @@
     btn.title = 'Report a bug';
     btn.setAttribute('aria-label', 'Report a bug');
     btn.textContent = '🐞';
-    btn.addEventListener('click', open);
+    btn.addEventListener('click', function () { open(btn); });
 
     // After 🎓 tour / before 📥 inbox keeps the emoji row visually ordered.
     var anchor = document.getElementById('inbox-btn');
@@ -300,7 +318,8 @@
     b.addEventListener('click', function () {
       var help = document.getElementById('help-modal');
       if (help) help.classList.remove('open');
-      setTimeout(open, 250);
+      var headerBtn = document.getElementById('bug-report-btn');
+      setTimeout(function () { open(headerBtn || b); }, 250);
     });
     inner.appendChild(b);
   }

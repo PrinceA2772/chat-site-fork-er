@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const DB_DIR = __dirname;
+const DB_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : __dirname;
 const DB_PATH = path.join(DB_DIR, 'db.json');
 const MAX_MESSAGES_PER_ROOM = 1000;
 const EDIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
@@ -22,11 +22,26 @@ function ensureDir() {
   }
 }
 
+// Write to a sibling temp file and rename it over the target, so a crash or
+// power loss mid-write cannot leave db.json truncated or half-written.
+function atomicWrite(file, contents) {
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, contents);
+  try {
+    fs.renameSync(tmp, file);
+  } catch (err) {
+    // Some Windows filesystems/AV scanners reject rename-over-existing.
+    // Clean up and fall back rather than losing the write entirely.
+    try { fs.rmSync(tmp, { force: true }); } catch {}
+    fs.writeFileSync(file, contents);
+  }
+}
+
 function read() {
   ensureDir();
   if (!fs.existsSync(DB_PATH)) {
     const seed = { rooms: { [DEFAULT_ROOM]: { messages: [], meta: defaultMeta() } }, users: {} };
-    fs.writeFileSync(DB_PATH, JSON.stringify(seed, null, 2));
+    atomicWrite(DB_PATH, JSON.stringify(seed, null, 2));
     return seed;
   }
   try {
@@ -48,14 +63,14 @@ function read() {
   } catch (e) {
     // Reset corrupt file
     const seed = { rooms: { [DEFAULT_ROOM]: { messages: [], meta: defaultMeta() } }, users: {} };
-    fs.writeFileSync(DB_PATH, JSON.stringify(seed, null, 2));
+    atomicWrite(DB_PATH, JSON.stringify(seed, null, 2));
     return seed;
   }
 }
 
 function write(data) {
   ensureDir();
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+  atomicWrite(DB_PATH, JSON.stringify(data, null, 2));
 }
 
 function ensureRoom(name, meta) {
@@ -594,6 +609,8 @@ function updateMessageReactions(room, messageId, newReactions) {
 }
 
 module.exports = {
+  DB_DIR,
+  DB_PATH,
   MAX_MESSAGES_PER_ROOM,
   EDIT_WINDOW_MS,
   ensureRoom,

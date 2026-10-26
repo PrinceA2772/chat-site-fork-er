@@ -74,6 +74,7 @@
       <a href="index.html" class="back-link">← Back to Chat</a>
       <div class="policy-links">
         <a href="terms.html">Terms of Use</a>
+        <a href="cookies.html">Cookies &amp; Storage</a>
         <a href="https://github.com/gamer-09" target="_blank" rel="noopener noreferrer">Operator</a>
       </div>
     </nav>
@@ -81,7 +82,7 @@
     <header>
       <h1>Privacy Policy</h1>
       <p class="subtitle">How ptr_29 Chat handles data</p>
-      <p class="effective">Effective and last updated: October 7, 2026</p>
+      <p class="effective">Effective and last updated: October 26, 2026</p>
     </header>
 
     <div class="notice" role="note">
@@ -90,12 +91,13 @@
 
     <section class="section">
       <h2>1. Scope and operator</h2>
-      <p>This Policy explains how the operator of ptr_29 Chat (“we,” “us,” or “our”) handles information when you use the production application at <a href="https://gamer-09.github.io/chat-site/">gamer-09.github.io/chat-site</a>. It covers the website, account access, Supabase anonymous-auth technical IDs, chat rooms, messages, presence, reactions, read receipts, and uploads.</p>
-      <p>The application is hosted on GitHub Pages and uses Supabase as its authentication, database, realtime, and file-storage provider.</p>
+      <p>This Policy explains how <strong>Samuel</strong> (“the operator,” “we,” “us,” or “our”) handles information when you use the production application at <a href="https://gamer-09.github.io/chat-site/">gamer-09.github.io/chat-site</a>. It covers the website, account registration and login, chat rooms, messages, presence, reactions, read receipts, uploads, and bug reports.</p>
+      <p>The application is hosted on GitHub Pages and uses Supabase for authentication, database, realtime, file storage, and bug-report intake. The operator's contact channels are listed in section 14. No separate registered address, company number, or dedicated email address is published at this time; the published contact channels are the official route for privacy and legal requests.</p>
     </section>
 
     <section class="section">
       <h2>2. Information processed</h2>
+      <p>We collect the information needed to run an account-based chat: no email address, phone number, payment details, or government identity document is required to register. You choose what to put in messages, uploads, your avatar, and optional bug-report contact field, so do not submit more than you need to.</p>
       <ul class="data-list">
         <li><strong>Account data:</strong> access requires login or registration at the start gate. We store your username, password hash — the password is SHA-256-salted on your device, then bcrypt-hashed server-side with a secret pepper — avatar, creation time, account session records, and whether the account has confirmed the 13+ age requirement, and whether the account has accepted the Terms/Privacy Policy. There is no password-recovery process, and hashes are not readable, listable, or modifiable through the API.</li>
         <li><strong>Profile data:</strong> your chosen username, optional avatar URL, Supabase authentication/user/client ID, and last-seen time. Display usernames containing “anonymous” are reserved and blocked.</li>
@@ -104,7 +106,8 @@
         <li><strong>Link processing:</strong> messages are checked for ordinary and Markdown-style links so unsafe protocols, private/local destinations, credential-obfuscated URLs, punycode look-alikes, risky downloads, and link spam can be blocked before storage. The app does not perform a full third-party malware or phishing reputation scan of destination sites.</li>
         <li><strong>Room moderation records:</strong> a room's owner/admin list, member list, and (if used) that room's ban list of account/browser identifiers.</li>
         <li><strong>Presence and activity:</strong> current room, online status, typing signals, unread counts, and notification events. Stale presence records are designed to be pruned after a short period.</li>
-        <li><strong>Browser data:</strong> profile preferences, terms acceptance, generated client identifiers, saved room passkeys, unread counts, theme, Supabase authentication session, and service-worker cache.</li>
+        <li><strong>Browser data:</strong> profile preferences, terms acceptance, generated client identifiers, saved room passkeys, unread counts, theme, Supabase authentication session, notification preference, and service-worker cache.</li>
+        <li><strong>Bug reports:</strong> if you use the in-app report form, we store the category, summary, description, reproduction steps, severity, any optional contact detail you type, page URL, browser user agent, viewport, theme, and build ID. Report content and metadata are stored in Supabase and may be mirrored automatically into the project's GitHub issue tracker.</li>
         <li><strong>Technical request data:</strong> hosting and infrastructure providers may process IP address, user agent, request time, referrer, and diagnostic/security logs when your browser connects.</li>
       </ul>
     </section>
@@ -120,6 +123,8 @@
         <li>Comply with applicable legal obligations and valid legal requests.</li>
       </ul>
       <p>There is currently no dedicated advertising or behavioral-analytics integration in the application, and we do not sell personal information.</p>
+      <h3>Legal bases</h3>
+      <p>Where data-protection law requires a legal basis, we rely on: <strong>performance of a contract</strong> or steps taken at your request to provide the chat account and Service; <strong>consent</strong> for optional features such as browser notifications and for the Terms/Privacy acceptance stored at signup; <strong>legitimate interests</strong> in operating, securing, moderating, and improving the Service and in handling abuse and bug reports, balanced against your rights; and <strong>legal obligation</strong> where we must keep or disclose information to comply with applicable law or a valid legal request.</p>
     </section>
 
     <section class="section">
@@ -131,7 +136,7 @@
       <h3>Room administrators, operator, and providers</h3>
       <p>Room owner/admin powers apply only to the room they manage. They can manage that room’s settings and membership and can clear or delete the room, but the application does not let them ban a user platform-wide, terminate an anonymous identity, delete another user’s profile, revoke a username, or force a username change.</p>
       <p>The Supabase project owner may be technically able to inspect or manually change database and storage records outside the application. This infrastructure access is separate from the room-admin interface and is not an automated global account-management or moderation feature.</p>
-      <p>GitHub and Supabase process data as infrastructure providers; jsDelivr delivers the Supabase browser library; DiceBear receives avatar requests when a generated avatar is used.</p>
+      <p>GitHub and Supabase process data as infrastructure providers. The app serves the Supabase browser library from its own <code>vendor/</code> folder rather than a public CDN. DiceBear receives your username (used as the avatar seed) and ordinary request data such as your IP address when the app loads a generated default avatar; if you set a custom avatar URL, your browser requests that URL from the site you chose. Bug reports may be copied into a GitHub issue in the project repository.</p>
     </section>
 
     <section class="section">
@@ -139,7 +144,7 @@
       <p>If you upload a profile picture, it is stored as part of your profile (avatar) and shown wherever your profile or presence appears. Room access lists store participant identifiers only; room settings display owner and admin usernames, not raw identifiers, where resolvable.</p>
       <p>Database records are stored in Supabase. Uploaded files are stored in a non-public Supabase Storage bucket. The application requests time-limited signed URLs—currently up to seven days—to display authorized media.</p>
       <p>Room passkeys are access-control values, not encryption keys. They may be stored in the Supabase room record and in your browser’s local storage. Anyone who obtains a valid passkey may be able to join the associated room.</p>
-      <p>Browser local storage is used instead of advertising cookies for application state. Clearing site data can remove your local profile, saved passkeys, preferences, and access to the same anonymous session.</p>
+      <p>Browser local storage is used instead of advertising cookies for application state. The Service does not set advertising, analytics, or cross-site tracking cookies. See the <a href="cookies.html">Cookies &amp; Storage Notice</a> for the categories of local data and how to clear them. Clearing site data can remove your local profile, saved passkeys, preferences, and access to the same local session.</p>
     </section>
 
     <section class="section">
@@ -150,6 +155,7 @@
       <p>Accounts: access to the app requires login. Passwords are SHA-256-salted on your device and then bcrypt-hashed server-side with a secret pepper; password hashes are not readable, listable, or modifiable through the API (the tables have no client-facing policies). Failed logins are rate-limited (5 tries, 15-minute lock). Your chat content is tied to your account id, so it follows you across devices after login.</p>
       <p>Deleting your account (the in-app <strong>Delete Account</strong> control, confirmed with your password) permanently erases the account record, your chat user, every message, reaction and read receipt sent under your name, your presence, and any rooms you own; the username then becomes available for registration again. A wrong password deletes nothing.</p>
       <p>Deleting a message or room record may not immediately delete an associated object from storage, cached signed URL, backup, or provider log. We do not promise instant or forensic erasure.</p>
+      <p><strong>Bug reports</strong> are kept for as long as needed to investigate and fix the reported issue, to maintain a record of security or abuse reports, and to operate the issue tracker; they are then deleted, anonymised, or left only in aggregated form. You may ask the operator to remove a report that contains your personal information.</p>
     </section>
 
     <section class="section">
@@ -167,7 +173,8 @@
 
     <section class="section">
       <h2>9. Third-party services and international processing</h2>
-      <p>The Service relies on <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">GitHub Pages</a>, <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer">Supabase</a>, jsDelivr, and DiceBear. Those providers may process information in countries outside your own and under their own privacy terms. Review their policies for details about infrastructure logs, security, retention, and international transfers.</p>
+      <p>The Service relies on <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">GitHub Pages</a> and GitHub issues, <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer">Supabase</a>, and <a href="https://www.dicebear.com/legal/privacy-policy/" target="_blank" rel="noopener noreferrer">DiceBear</a>. Links to WhatsApp, Instagram, and YouTube open those services only when you choose them; those services then process data under their own policies.</p>
+      <p>These providers may process information in countries outside your own. Where required, transfers rely on the providers' contractual safeguards, standard data-protection clauses, or another lawful transfer mechanism. Review their policies for details about infrastructure logs, security, retention, and international transfers.</p>
     </section>
 
     <section class="section">
@@ -180,6 +187,7 @@
       <p>Depending on where you live, you may have rights to access, correct, delete, restrict, or object to certain processing, or to receive a portable copy. These rights may be limited by the account/technical-ID nature of the Service, other users’ rights, legal obligations, and the ability to verify that a browser identity or content belongs to you.</p>
       <p>You can edit your own profile, delete eligible messages, leave rooms, clear browser data, disable notifications, or use the in-app <strong>Delete Account</strong> control, which performs the full erase described in section 6. For a broader request, contact the operator and provide the minimum information needed to identify the relevant account, room, or message.</p>
       <p>The current creator/admin interface cannot generally terminate another Supabase technical auth identity, ban an arbitrary user across the platform, force a username change, or automatically erase every record associated with a person. The reserved “anonymous” username pattern is blocked by app/database rules for new and legacy account use. A request may require a manual Supabase data operation, may be limited by the ability to verify ownership, and may not be technically possible for every provider record or copy.</p>
+      <p>You may also lodge a complaint with your local data-protection or consumer-protection authority. Nothing in this Policy or the Terms removes a right or remedy that applicable law says cannot be removed.</p>
     </section>
 
     <section class="section">
@@ -190,7 +198,7 @@
       <p>We may update this Policy when the Service, providers, or legal requirements change. The revised page will show a new effective date. Material changes apply prospectively.</p>
     </section>
 
-    <section class="section">
+    <section class="section" id="contact">
       <h2>14. Contact</h2>
       <p>For privacy requests, abuse reports, security concerns, or support, contact the operator through the official channels below. Do not include passwords, room passkeys, or unrelated sensitive information.</p>
       <ul>
@@ -202,7 +210,7 @@
     </section>
 
     <footer class="last-updated">
-      <p>This Privacy Policy was last updated on October 7, 2026.</p>
+      <p>This Privacy Policy was last updated on October 26, 2026. Operated by Samuel.</p>
     </footer>
     <footer class="last-updated">
       <p>© 2026 gamer-09 — <strong>All rights reserved.</strong> This site is proprietary and not open source; viewing or using it grants no permission to copy, reuse, or redistribute it or any part of its code. See the repository <a href="https://github.com/gamer-09/chat-site/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">LICENSE</a>.</p>

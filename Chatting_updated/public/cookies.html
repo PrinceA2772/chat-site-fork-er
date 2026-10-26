@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="Cookies and local storage notice for ptr_29 Chat">
+  <title>Cookies &amp; Storage Notice — ptr_29 Chat</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #0b1220;
+      --border: #1f2937;
+      --border-light: #334155;
+      --accent: #60a5fa;
+      --accent-strong: #2563eb;
+      --text: #e2e8f0;
+      --text-muted: #a8b3c4;
+      --warning-bg: #2a1d0b;
+      --warning-border: #92400e;
+      --warning-text: #fde68a;
+    }
+    * { box-sizing: border-box; }
+    html { color-scheme: dark; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.65;
+    }
+    .container { width: min(900px, 100%); margin: 0 auto; padding: 34px 20px 52px; }
+    .top-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+    .back-link, a { color: var(--accent); }
+    .back-link { font-weight: 650; text-decoration: none; }
+    .back-link:hover, a:hover { text-decoration: underline; }
+    .policy-links { display: flex; gap: 14px; font-size: 14px; }
+    header { margin-bottom: 28px; padding-bottom: 22px; border-bottom: 1px solid var(--border); }
+    h1 { margin: 0 0 7px; font-size: clamp(28px, 5vw, 40px); line-height: 1.15; }
+    h2 { margin: 0 0 12px; font-size: 21px; line-height: 1.3; }
+    h3 { margin: 20px 0 8px; font-size: 16px; }
+    p { margin: 0 0 13px; color: var(--text-muted); }
+    ul { margin: 0 0 13px; padding-left: 22px; color: var(--text-muted); }
+    li { margin: 7px 0; }
+    strong { color: var(--text); }
+    code { font-size: 0.92em; overflow-wrap: anywhere; }
+    .subtitle, .effective { color: var(--text-muted); }
+    .effective { font-size: 14px; }
+    .notice {
+      margin-bottom: 20px;
+      padding: 16px 18px;
+      border: 1px solid var(--warning-border);
+      border-radius: 12px;
+      background: var(--warning-bg);
+      color: var(--warning-text);
+    }
+    .notice strong { color: var(--warning-text); }
+    .section { margin-bottom: 16px; padding: 22px; border: 1px solid var(--border); border-radius: 13px; background: var(--panel); }
+    .last-updated { margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border); text-align: center; font-size: 13px; }
+    @media (max-width: 640px) {
+      .container { padding: 20px max(16px, env(safe-area-inset-right)) 38px max(16px, env(safe-area-inset-left)); }
+      .top-nav { align-items: flex-start; flex-direction: column; }
+      .section { padding: 17px; }
+      * { overflow-wrap: anywhere; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <nav class="top-nav" aria-label="Legal pages">
+      <a href="index.html" class="back-link">← Back to Chat</a>
+      <div class="policy-links">
+        <a href="terms.html">Terms of Use</a>
+        <a href="privacy.html">Privacy Policy</a>
+      </div>
+    </nav>
+
+    <header>
+      <h1>Cookies &amp; Storage Notice</h1>
+      <p class="subtitle">What ptr_29 Chat keeps in your browser</p>
+      <p class="effective">Effective and last updated: October 26, 2026</p>
+    </header>
+
+    <div class="notice" role="note">
+      <strong>Short version:</strong> the Service does not set advertising, analytics, or cross-site tracking cookies. It uses your browser's local storage and session storage for login, preferences, and chat state, and it shows a short notice on first visit.
+    </div>
+
+    <section class="section">
+      <h2>1. Cookies we set</h2>
+      <p>ptr_29 Chat does not set its own <code>document.cookie</code> values for advertising, analytics, personalisation, or cross-site tracking. It does not embed advertising pixels or third-party analytics scripts. Because no non-essential cookies are set, the site does not show a cookie-consent prompt; it shows a storage notice instead.</p>
+      <p>Your browser may still store cookies set by GitHub Pages or by a third-party site you choose to open (for example WhatsApp, Instagram, or YouTube). Those are controlled by the third party, not by this app.</p>
+    </section>
+
+    <section class="section">
+      <h2>2. Local storage and session storage</h2>
+      <p>The app stores data in your browser to keep you signed in and to remember your choices. These values stay on your device and are readable by the app's JavaScript on this site. Clearing site data removes them.</p>
+      <ul>
+        <li><strong>Account and session:</strong> your Supabase authentication session and account profile cache, so you do not have to log in on every page load.</li>
+        <li><strong>Identity:</strong> your account/client identifier and related flags used to reconnect your username, rooms, and history.</li>
+        <li><strong>Preferences:</strong> theme (light/dark), Glass UI and backdrop-motion choices, notification preference, and similar interface settings.</li>
+        <li><strong>Chat state:</strong> saved room passkeys, unread counts, inbox-seen state, reply/draft state, and guided-tour or first-visit flags.</li>
+        <li><strong>Notices:</strong> a flag remembering that you dismissed the storage notice or a seasonal notice.</li>
+        <li><strong>Service-worker cache:</strong> static files cached so the app can load quickly and survive a flaky connection. This is not used to track you across other sites.</li>
+      </ul>
+      <p>Session storage is used for short-lived page state, such as avoiding a reload loop after a version update. It is cleared when the tab or browser session ends.</p>
+    </section>
+
+    <section class="section">
+      <h2>3. Why we use it</h2>
+      <ul>
+        <li><strong>Strictly necessary:</strong> authenticating you, keeping your session, and protecting the Service against abuse.</li>
+        <li><strong>Functional:</strong> remembering your theme, layout, notification, and motion choices.</li>
+        <li><strong>Chat functionality:</strong> remembering joined rooms, passkeys, unread counts, and local chat state.</li>
+      </ul>
+      <p>These storage uses support a feature you requested or are needed to deliver the Service. They are not used to build an advertising profile or to sell data. See the <a href="privacy.html">Privacy Policy</a> for the legal bases and retention rules that apply to account and message data.</p>
+    </section>
+
+    <section class="section">
+      <h2>4. Third-party requests</h2>
+      <p>When the app loads a generated default avatar, your browser requests an image from <strong>DiceBear</strong> (<code>api.dicebear.com</code>) using your username as the seed, so DiceBear receives that username and ordinary request data such as your IP address. If you set a custom avatar URL, your browser requests that URL from the site you chose. Authentication, database, realtime, storage, and bug-report requests go to <strong>Supabase</strong>. The site itself is served by <strong>GitHub Pages</strong>, which may keep standard server logs.</p>
+      <p>Opening a contact link (WhatsApp, Instagram, YouTube, GitHub) leaves this site and is governed by that provider's cookie and privacy practices.</p>
+    </section>
+
+    <section class="section">
+      <h2>5. How to clear or block storage</h2>
+      <p>You can clear cookies and site data, or block storage for this site, in your browser settings. In most browsers this is under Settings → Privacy and security → Cookies and site data → Manage/clear data. You can also use a private/incognito window, which discards storage when you close it.</p>
+      <p>If you clear or block storage, you may be signed out, lose saved room passkeys, lose your local preferences, or be unable to use features that depend on an account session. Blocking all storage may prevent login.</p>
+    </section>
+
+    <section class="section">
+      <h2>6. Contact</h2>
+      <p>Questions about this notice can go to the operator through the official channels listed on the <a href="privacy.html#contact">Privacy Policy contact section</a>. Do not send passwords, room passkeys, or unnecessary sensitive information.</p>
+    </section>
+
+    <footer class="last-updated">
+      <p>This Cookies &amp; Storage Notice was last updated on October 26, 2026. Operated by Samuel.</p>
+    </footer>
+    <footer class="last-updated">
+      <p>© 2026 gamer-09 — <strong>All rights reserved.</strong> Code is proprietary. See the repository <a href="https://github.com/gamer-09/chat-site/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">LICENSE</a>. Operated by Samuel.</p>
+    </footer>
+  </main>
+</body>
+</html>

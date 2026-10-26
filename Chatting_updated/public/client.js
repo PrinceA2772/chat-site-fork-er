@@ -324,6 +324,12 @@
       return d.innerHTML;
     },
 
+    // For values interpolated inside HTML attributes (escapeHtml does not
+    // escape quotes, so using it there can break out of the attribute).
+    escapeAttr: (text) => String(text ?? '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c])),
+
     formatTime: (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 
     formatReadBy: (names, maxShow = 3) => {
@@ -429,9 +435,9 @@
       const clean = utils.trimLinkToken(match);
       const check = utils.validateLink(clean);
       if (!check.ok) return match;
-      const href = utils.escapeHtml(check.url);
+      const href = check.url;
       const label = utils.escapeHtml(clean.length > 80 ? clean.slice(0, 77) + '…' : clean);
-      return `<a class="safe-link" href="${href}" data-url="${href}" target="_blank" rel="noopener noreferrer nofollow ugc">${label}</a>${utils.escapeHtml(trailing)}`;
+      return `<a class="safe-link" href="${utils.escapeAttr(href)}" data-url="${utils.escapeAttr(href)}" target="_blank" rel="noopener noreferrer nofollow ugc">${label}</a>${utils.escapeHtml(trailing)}`;
     }),
 
     uniqueSafeLinks: (text, max = 2) => {
@@ -492,7 +498,7 @@
       return `<div class="link-previews">${links.map(href => {
         let p;
         try { p = utils.linkPreviewData(href); } catch { return ''; }
-        return `<a class="link-preview-card safe-link" href="${utils.escapeHtml(p.href)}" data-url="${utils.escapeHtml(p.href)}" target="_blank" rel="noopener noreferrer nofollow ugc">
+        return `<a class="link-preview-card safe-link" href="${utils.escapeAttr(p.href)}" data-url="${utils.escapeAttr(p.href)}" target="_blank" rel="noopener noreferrer nofollow ugc">
           <div class="link-preview-top">${utils.escapeHtml(p.href)}</div>
           <div class="link-preview-main">
             <div class="link-preview-thumb"><span class="link-preview-glyph">🔗</span></div>
@@ -535,19 +541,92 @@
   };
 
   // ── Modals ─────────────────────────────────────────────────────────────────
+  const FOCUSABLE_SELECTOR = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled]):not([type="hidden"])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+  ].join(',');
+
+  function activeDialog() {
+    return document.querySelector('.modal-overlay.open, .lightbox.open, .ag-overlay');
+  }
+
+  function dialogFocusables(container) {
+    return Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR))
+      .filter((node) => node.getClientRects().length > 0);
+  }
+
+  function focusFirstIn(container) {
+    const list = dialogFocusables(container);
+    if (list.length) list[0].focus();
+    else if (container.tabIndex >= 0 || container === document.activeElement) container.focus();
+    else {
+      container.setAttribute('tabindex', '-1');
+      container.focus();
+    }
+  }
+
+  // Keyboard users must not tab out of an open dialog into the page behind it.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const dialog = document.querySelector('.modal-overlay.open');
+      if (!dialog) return;
+      e.preventDefault();
+      modals.close(dialog);
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const dialog = activeDialog();
+    if (!dialog) return;
+    const list = dialogFocusables(dialog);
+    if (!list.length) return;
+    const first = list[0];
+    const last = list[list.length - 1];
+    const inside = dialog.contains(document.activeElement);
+    if (e.shiftKey && (!inside || document.activeElement === first)) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && (!inside || document.activeElement === last)) {
+      e.preventDefault();
+      first.focus();
+    }
+  });
+
+  let lastDialogFocus = null;
+
   const modals = {
     open: (m) => {
+      if (!m) return;
+      lastDialogFocus = document.activeElement;
       // Dismiss the on-screen keyboard before showing the modal so it
       // doesn't cover the modal content (especially the checkbox / Save
       // button at the bottom of the terms-agreement form on mobile).
       if (document.activeElement && document.activeElement !== document.body) {
         document.activeElement.blur();
       }
-      m?.classList.add('open');
+      m.classList.add('open');
+      requestAnimationFrame(() => focusFirstIn(m));
     },
-    close:    (m) => m?.classList.remove('open'),
-    closeAll: ()  => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open')),
+    close: (m) => {
+      m?.classList.remove('open');
+      restoreDialogFocus();
+    },
+    closeAll: () => {
+      document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
+      restoreDialogFocus();
+    },
   };
+
+  function restoreDialogFocus() {
+    const target = lastDialogFocus;
+    lastDialogFocus = null;
+    if (target && document.contains(target) && typeof target.focus === 'function') {
+      try { target.focus(); } catch {}
+    }
+  }
 
   function setGlassUiEnabled(enabled) {
     document.body.classList.toggle('ptr29-glass-ui', !!enabled);
@@ -973,9 +1052,9 @@
               const isOwnerChip = isMine(u.clientId) || String(u.clientId) === String(meta.ownerId || '');
               const canRemove = state.canManageCurrentRoom && !isOwnerChip && state.currentRoom !== 'general';
               const chipName = (isMine(u.clientId) && state.myUsername) ? state.myUsername : u.username;
-              return `<span class="chip member-chip" title="${utils.escapeHtml(chipName)}">
+              return `<span class="chip member-chip" title="${utils.escapeAttr(chipName)}">
                 ${utils.escapeHtml(chipName)}${isOwnerChip ? ' 👑' : ''}
-                ${canRemove ? `<button class="chip-remove" data-action="remove-admin" data-id="${u.clientId}" title="Remove admin">×</button>` : ''}
+                ${canRemove ? `<button class="chip-remove" data-action="remove-admin" data-id="${utils.escapeAttr(u.clientId)}" title="Remove admin">×</button>` : ''}
               </span>`;
             }).join('');
         elements.roomAdminsList.querySelectorAll('.chip-remove[data-action="remove-admin"]').forEach(btn => {
@@ -1002,9 +1081,9 @@
         ? '<span style="color:var(--text-dim)">None</span>'
         : membersInfo.map(u => {
             const canRemove = state.canManageCurrentRoom && state.currentRoom !== 'general';
-            return `<span class="chip member-chip" title="${utils.escapeHtml(u.username)}">
+            return `<span class="chip member-chip" title="${utils.escapeAttr(u.username)}">
               ${utils.escapeHtml(u.username)}
-              ${canRemove ? `<button class="chip-remove" data-action="remove-member" data-id="${u.clientId}" title="Remove member">×</button>` : ''}
+              ${canRemove ? `<button class="chip-remove" data-action="remove-member" data-id="${utils.escapeAttr(u.clientId)}" title="Remove member">×</button>` : ''}
             </span>`;
           }).join('');
 
@@ -1268,7 +1347,7 @@
       if (msg.replyTo) {
         const excerpt = msg.replyTo.excerpt || msg.replyTo.message || (msg.replyTo.type === 'image' ? '[image]' : '');
         content += `
-          <div class="reply-preview" data-reply-id="${msg.replyTo.id}">
+          <div class="reply-preview" data-reply-id="${utils.escapeAttr(msg.replyTo.id)}">
             <div class="user">${utils.escapeHtml(msg.replyTo.username)}</div>
             <div class="excerpt">${utils.escapeHtml(utils.truncate(excerpt, 200))}</div>
           </div>`;
@@ -1281,9 +1360,9 @@
         /\.(png|jpe?g|gif|webp|avif|bmp)$/i.test(msg.message || ''));
       if (msg.type === 'image' || fileIsImage) el.classList.add('image-msg');
       const bodyHtml = (msg.type === 'image' || fileIsImage)
-        ? `<img class="msg-image" src="${msg.dataUrl || msg.imageUrl || msg.fileUrl || ''}" alt="Shared image" loading="lazy">`
+        ? `<img class="msg-image" src="${utils.escapeAttr(msg.dataUrl || msg.imageUrl || msg.fileUrl || '')}" alt="Shared image from ${utils.escapeAttr(msg.username || 'Anonymous')}" loading="lazy">`
         : msg.type === 'file'
-          ? `<a class="file-attachment" href="${msg.fileUrl || '#'}" download="${utils.escapeHtml(msg.message || 'file')}" target="_blank" rel="noopener noreferrer"><span>📎</span><span>${utils.escapeHtml(msg.message || 'File')}</span>${msg.fileSize ? `<span style="color:var(--text-dim);font-size:11px">${utils.formatFileSize(msg.fileSize)}</span>` : ''}</a>`
+          ? `<a class="file-attachment" href="${utils.escapeAttr(msg.fileUrl || '#')}" download="${utils.escapeAttr(msg.message || 'file')}" target="_blank" rel="noopener noreferrer"><span>📎</span><span>${utils.escapeHtml(msg.message || 'File')}</span>${msg.fileSize ? `<span style="color:var(--text-dim);font-size:11px">${utils.formatFileSize(msg.fileSize)}</span>` : ''}</a>`
           : utils.renderTextBody(msg.message || '');
       const bodyIsText = !(msg.type === 'image' || fileIsImage || msg.type === 'file');
 
@@ -1294,7 +1373,8 @@
             const isMeU = (u) => u.userId === state.myClientId || u.userId === myUid || u.username === state.myUsername;
             const mine = users.some(isMeU);
             const names = users.map(u => isMeU(u) ? 'you' : u.username).join(', ');
-            return `<button class="reaction-pill${mine ? ' active' : ''}" data-emoji="${emoji}" data-msg-id="${msg.id}" data-names="${utils.escapeHtml(names)}">${emoji} ${users.length}</button>`;
+            const label = `${emoji} reaction, ${users.length} ${users.length === 1 ? 'person' : 'people'}${mine ? ', including you' : ''}`;
+            return `<button class="reaction-pill${mine ? ' active' : ''}" data-emoji="${utils.escapeAttr(emoji)}" data-msg-id="${utils.escapeAttr(msg.id)}" data-names="${utils.escapeAttr(names)}" aria-label="${utils.escapeAttr(label)}" title="${utils.escapeAttr(names)}">${utils.escapeHtml(emoji)} ${users.length}</button>`;
           }).join('')}</div>`
         : '<div class="reactions"></div>';
 
@@ -1305,14 +1385,14 @@
 
       content += `
         <div class="msg-actions">
-          <button class="msg-action-btn" data-action="reply" title="Reply">↩</button>
-          <button class="msg-action-btn" data-action="react" title="React">😊</button>
-          ${msg.message && msg.type === 'text' ? `<button class="msg-action-btn" data-action="copy" title="Copy">📋</button>` : ''}
-          ${canEdit  ? `<button class="msg-action-btn" data-action="edit"   title="Edit">✏️</button>` : ''}
-          ${isMe     ? `<button class="msg-action-btn danger" data-action="delete" title="Delete">🗑</button>` : ''}
+          <button class="msg-action-btn" data-action="reply" title="Reply" aria-label="Reply to this message">↩</button>
+          <button class="msg-action-btn" data-action="react" title="React" aria-label="Add a reaction">😊</button>
+          ${msg.message && msg.type === 'text' ? `<button class="msg-action-btn" data-action="copy" title="Copy" aria-label="Copy message text">📋</button>` : ''}
+          ${canEdit  ? `<button class="msg-action-btn" data-action="edit"   title="Edit" aria-label="Edit message">✏️</button>` : ''}
+          ${isMe     ? `<button class="msg-action-btn danger" data-action="delete" title="Delete" aria-label="Delete message">🗑</button>` : ''}
         </div>
         <div class="meta">
-          <img class="avatar" src="${avatarUrl}" alt="">
+          <img class="avatar" src="${utils.escapeAttr(avatarUrl)}" alt="">
           <span class="name">${utils.escapeHtml(msg.username || 'Anonymous')}</span>
           <span class="time">${utils.formatTime(msg.timestamp)}</span>
           ${msg.edited ? '<span class="edited">(edited)</span>' : ''}
@@ -1482,7 +1562,8 @@
         const isMeU = (u) => u.userId === state.myClientId || u.userId === myUid || u.username === state.myUsername;
         const mine = users.some(isMeU);
         const names = users.map(u => isMeU(u) ? 'you' : u.username).join(', ');
-        return `<button class="reaction-pill${mine ? ' active' : ''}" data-emoji="${emoji}" data-names="${utils.escapeHtml(names)}">${emoji} ${users.length}</button>`;
+        const label = `${emoji} reaction, ${users.length} ${users.length === 1 ? 'person' : 'people'}${mine ? ', including you' : ''}`;
+        return `<button class="reaction-pill${mine ? ' active' : ''}" data-emoji="${utils.escapeAttr(emoji)}" data-names="${utils.escapeAttr(names)}" aria-label="${utils.escapeAttr(label)}" title="${utils.escapeAttr(names)}">${utils.escapeHtml(emoji)} ${users.length}</button>`;
       }).join('');
       const msgId = msgEl.dataset.id;
       div.querySelectorAll('.reaction-pill').forEach(pill => {
@@ -1741,7 +1822,7 @@
           const statusTxt = (u.last_seen && Number.isFinite(ls) && ls > 0)
             ? 'seen ' + agoMs(ls)
             : 'offline';
-          d.innerHTML = `<img src="${av}" alt="" style="width:28px;height:28px;border-radius:50%;opacity:.55;filter:grayscale(1);border:1px solid var(--border);object-fit:cover">
+          d.innerHTML = `<img src="${utils.escapeAttr(av)}" alt="" style="width:28px;height:28px;border-radius:50%;opacity:.55;filter:grayscale(1);border:1px solid var(--border);object-fit:cover">
             <div style="min-width:0">
               <div style="font-size:13px;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escFn(nm)}</div>
               <div style="font-size:11px;color:var(--text-dim)">${statusTxt}</div>
@@ -1827,12 +1908,12 @@
         const el = document.createElement('div');
         el.className = 'online-item';
         el.innerHTML = `
-          <img src="${av}" alt="">
+          <img src="${utils.escapeAttr(av)}" alt="">
           <div class="info">
             <div class="name">${utils.escapeHtml(user.username || 'Anonymous')}</div>
             <div class="status">${user.room ? `in #${user.room}` : 'online'}</div>
           </div>
-          <button type="button" class="online-menu-btn" data-menu-user="${utils.escapeHtml(user.username || 'Anonymous')}" title="Options">⋮</button>
+          <button type="button" class="online-menu-btn" data-menu-user="${utils.escapeAttr(user.username || 'Anonymous')}" title="Options">⋮</button>
           <div class="online-indicator"></div>
         `;
         elements.onlineList.appendChild(el);
@@ -2593,12 +2674,25 @@
     elements.replyPreviewBar.querySelector('.close-btn').addEventListener('click', messages.clearReply);
 
     // Lightbox
-    elements.lightbox.addEventListener('click', () => elements.lightbox.classList.remove('open'));
+    let lightboxReturnFocus = null;
+    const closeLightbox = () => {
+      elements.lightbox.classList.remove('open');
+      const target = lightboxReturnFocus;
+      lightboxReturnFocus = null;
+      if (target && document.contains(target) && typeof target.focus === 'function') {
+        try { target.focus(); } catch {}
+      }
+    };
+    elements.lightbox.addEventListener('click', closeLightbox);
+    const lightboxClose = document.getElementById('lightbox-close');
+    if (lightboxClose) {
+      lightboxClose.addEventListener('click', closeLightbox);
+    }
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        elements.lightbox.classList.remove('open');
+        closeLightbox();
         elements.contextMenu.classList.remove('open');
         modals.closeAll();
         document.querySelectorAll('.msg.actions-visible').forEach(m => m.classList.remove('actions-visible'));
@@ -2608,8 +2702,15 @@
     // Messages area clicks: lightbox + tap-to-reveal action bar
     elements.messages.addEventListener('click', (e) => {
       if (e.target.classList.contains('msg-image')) {
+        lightboxReturnFocus = document.activeElement;
         elements.lightboxImg.src = e.target.src;
+        elements.lightboxImg.alt = e.target.alt
+          ? `Enlarged view: ${e.target.alt}`
+          : 'Enlarged shared image';
         elements.lightbox.classList.add('open');
+        const lbClose = document.getElementById('lightbox-close');
+        if (lbClose) lbClose.focus();
+        else elements.lightbox.focus();
         return;
       }
       const msgEl = e.target.closest('.msg');
@@ -2964,6 +3065,22 @@
         if (isLight) { applyDarkTheme(); localStorage.setItem('ptr29_theme', 'dark'); }
         else          { applyLightTheme(); localStorage.setItem('ptr29_theme', 'light'); }
       });
+    }
+
+    // First-visit local-storage notice (there are no advertising/tracking cookies).
+    const storageNotice = document.getElementById('storage-notice');
+    if (storageNotice) {
+      const STORAGE_NOTICE_KEY = 'ptr29_storage_notice_v1';
+      let seen = false;
+      try { seen = localStorage.getItem(STORAGE_NOTICE_KEY) === '1'; } catch {}
+      if (!seen) storageNotice.hidden = false;
+      const ok = document.getElementById('storage-notice-ok');
+      if (ok) {
+        ok.addEventListener('click', () => {
+          try { localStorage.setItem(STORAGE_NOTICE_KEY, '1'); } catch {}
+          storageNotice.hidden = true;
+        });
+      }
     }
   };
 
@@ -3604,7 +3721,7 @@
       body.innerHTML = `
         <div style="text-align:center;padding:6px 0 2px">
           <div style="position:relative;display:inline-block">
-            <img src="${d.avatar}" alt="" style="width:96px;height:96px;border-radius:50%;border:3px solid ${d.online ? 'var(--success)' : 'var(--border-light)'}">
+            <img src="${utils.escapeAttr(d.avatar)}" alt="" style="width:96px;height:96px;border-radius:50%;border:3px solid ${d.online ? 'var(--success)' : 'var(--border-light)'}">
             <span style="position:absolute;bottom:4px;right:4px;width:16px;height:16px;border-radius:50%;background:${d.online ? 'var(--success)' : 'var(--text-dim)'};border:3px solid var(--panel)"></span>
           </div>
           <div style="font-size:22px;font-weight:700;color:var(--text);margin-top:10px">${utils.escapeHtml(d.username)}</div>
@@ -4060,24 +4177,25 @@
           <button type="button" class="ag-tab active" data-m="login">Log in</button>
           <button type="button" class="ag-tab" data-m="reg">Create account</button>
         </div>
-        <input id="ag-user" placeholder="Username" autocomplete="username">
+        <input id="ag-user" placeholder="Username" aria-label="Username" autocomplete="username">
         <div id="ag-user-note" style="display:none;font-size:11.5px;color:var(--text-dim);line-height:1.35;margin:-4px 0 10px">
           Email-style usernames such as <b>name@gmail.com</b> are allowed, but they are treated only as usernames — no email verification, email login, or password recovery is provided. Names containing “anonymous” are not allowed.
         </div>
-        <input id="ag-pass" type="password" placeholder="Password" autocomplete="current-password">
+        <input id="ag-pass" type="password" placeholder="Password" aria-label="Password" autocomplete="current-password">
         <label id="ag-age-row" style="display:none;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-muted);line-height:1.35;margin:-2px 0 10px">
           <input id="ag-age" type="checkbox" style="margin-top:2px">
           <span>I confirm I am at least 13 years old. Children under 13 may not create an account.</span>
         </label>
         <label id="ag-terms-row" style="display:none;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-muted);line-height:1.35;margin:-2px 0 10px">
           <input id="ag-terms" type="checkbox" style="margin-top:2px">
-          <span>I agree to the <a href="terms.html" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none">Terms and Conditions</a> and <a href="privacy.html" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none">Privacy Policy</a>.</span>
+          <span>I agree to the <a href="terms.html" target="_blank" rel="noopener noreferrer" style="color:var(--accent-text);text-decoration:none">Terms and Conditions</a> and <a href="privacy.html" target="_blank" rel="noopener noreferrer" style="color:var(--accent-text);text-decoration:none">Privacy Policy</a>.</span>
         </label>
         <div id="ag-err" class="ag-err"></div>
         <button id="ag-go" class="ag-go" type="button">Continue ➤</button>
         <div class="ag-foot">🔒 No plaintext passwords ever stored</div>
       </div>`;
     document.body.append(ov);
+    requestAnimationFrame(() => focusFirstIn(ov));
     if (message) {
       const err = ov.querySelector('#ag-err');
       if (err) err.textContent = message;
@@ -4108,7 +4226,7 @@
         const pwCheck = utils.validatePassword(pw, un);
         if (!pwCheck.ok) { err.textContent = pwCheck.message; return; }
         if (!ov.querySelector('#ag-age')?.checked) { err.textContent = 'Confirm you are at least 13 years old to create an account.'; return; }
-        if (!ov.querySelector('#ag-terms')?.checked) { err.textContent = 'You must agree to the Terms and Conditions to create an account.'; return; }
+        if (!ov.querySelector('#ag-terms')?.checked) { err.textContent = 'You must agree to the Terms and Conditions and Privacy Policy to create an account.'; return; }
       } else if (pw.length < 6) { err.textContent = 'Password too short.'; return; }
       const h = await sha256hex(pw + ':' + un.toLowerCase());
       if (!h) { err.textContent = 'Crypto unavailable in this browser.'; return; }
@@ -4126,7 +4244,8 @@
           locked: 'Too many failed attempts — locked for 15 minutes.',
           invalid_username: 'Invalid username. Usernames containing anonymous are not allowed.',
           age_required: 'You must confirm you are at least 13 years old to create an account.',
-          terms_required: 'You must agree to the Terms and Conditions to create an account.',
+          terms_required: 'You must agree to the Terms and Conditions and Privacy Policy to create an account.',
+          request_failed: 'The server could not complete that request. Please try again in a moment.',
         };
         err.textContent = (map[res && res.error]) || (res && res.error) || 'Failed.';
         return;
@@ -4223,7 +4342,7 @@
           <p class="ag-sub">Before continuing, this existing account must accept the current Terms and Privacy Policy.</p>
           <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--text);line-height:1.4;margin:8px 0 12px">
             <input id="ag-existing-terms" type="checkbox" style="margin-top:2px">
-            <span>I agree to the <a href="terms.html" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none">Terms and Conditions</a> and <a href="privacy.html" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none">Privacy Policy</a>.</span>
+            <span>I agree to the <a href="terms.html" target="_blank" rel="noopener noreferrer" style="color:var(--accent-text);text-decoration:none">Terms and Conditions</a> and <a href="privacy.html" target="_blank" rel="noopener noreferrer" style="color:var(--accent-text);text-decoration:none">Privacy Policy</a>.</span>
           </label>
           <div id="ag-terms-err" class="ag-err"></div>
           <button id="ag-terms-go" class="ag-go" type="button">Accept and continue ➤</button>

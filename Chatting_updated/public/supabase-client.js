@@ -523,10 +523,10 @@
       if (!acct) return Promise.resolve({ ok: false, error: 'no_account' });
       return sb.rpc('claim_browser_rooms', { p_acct: String(acct) })
         .then(function (r) {
-          if (r.error) return { ok: false, error: r.error.message || 'claim_failed' };
+          if (r.error) return { ok: false, error: 'request_failed' };
           return r.data || { ok: false, error: 'claim_failed' };
         })
-        .catch(function (e) { return { ok: false, error: String(e && e.message || e) }; });
+        .catch(function (e) { return { ok: false, error: 'request_failed' }; });
     },
 
     createRoom: function (name, isPrivate) {
@@ -671,7 +671,7 @@
     roomAddMember: function (room, identifier) {
       return sb.rpc('room_add_member', { room_name: sanitizeRoom(room), identifier: String(identifier || '') })
         .then(function (r) {
-          if (r.error) return { ok: false, error: r.error.message || 'failed' };
+          if (r.error) return { ok: false, error: 'request_failed' };
           var out = r.data || { ok: false, error: 'failed' };
           if (out.ok) { api.getRoomMeta(room).then(function (m) { if (m) dispatch('room-meta', { room: room, meta: m }); }); api.refreshRooms(); }
           return out;
@@ -680,7 +680,7 @@
     roomAddAdmin: function (room, identifier) {
       return sb.rpc('room_add_admin', { room_name: sanitizeRoom(room), identifier: String(identifier || '') })
         .then(function (r) {
-          if (r.error) return { ok: false, error: r.error.message || 'failed' };
+          if (r.error) return { ok: false, error: 'request_failed' };
           var out = r.data || { ok: false, error: 'failed' };
           if (out.ok) { api.getRoomMeta(room).then(function (m) { if (m) dispatch('room-meta', { room: room, meta: m }); }); api.refreshRooms(); }
           return out;
@@ -689,7 +689,7 @@
     roomKick: function (room, identifier) {
       return sb.rpc('room_kick', { room_name: sanitizeRoom(room), identifier: String(identifier || '') })
         .then(function (r) {
-          if (r.error) return { ok: false, error: r.error.message || 'failed' };
+          if (r.error) return { ok: false, error: 'request_failed' };
           var out = r.data || { ok: false, error: 'failed' };
           if (out.ok) { api.getRoomMeta(room).then(function (m) { if (m) dispatch('room-meta', { room: room, meta: m }); }); api.refreshRooms(); }
           return out;
@@ -703,22 +703,22 @@
     roomUnban: function (room, identifier) {
       return sb.rpc('room_unban', { room_name: sanitizeRoom(room), identifier: String(identifier || '') })
         .then(function (r) {
-          if (r.error) return { ok: false, error: r.error.message || 'failed' };
+          if (r.error) return { ok: false, error: 'request_failed' };
           return r.data || { ok: false, error: 'failed' };
         });
     },
     roomListBans: function (room) {
       return sb.rpc('room_list_bans', { room_name: sanitizeRoom(room) })
         .then(function (r) {
-          if (r.error) return { ok: false, error: r.error.message || 'failed' };
+          if (r.error) return { ok: false, error: 'request_failed' };
           return r.data || { ok: false, error: 'failed' };
         })
-        .catch(function (e) { return { ok: false, error: String(e && e.message || e) }; });
+        .catch(function (e) { return { ok: false, error: 'request_failed' }; });
     },
     roomClaimOwnership: function (room) {
       return sb.rpc('room_claim_ownership', { room_name: sanitizeRoom(room) })
         .then(function (r) {
-          if (r.error) return { ok: false, error: r.error.message || 'failed' };
+          if (r.error) return { ok: false, error: 'request_failed' };
           var out = r.data || { ok: false, error: 'failed' };
           if (out.ok) { api.getRoomMeta(room).then(function (m) { if (m) dispatch('room-meta', { room: room, meta: m }); }); api.refreshRooms(); }
           return out;
@@ -1130,7 +1130,7 @@
         p_build: f(p.build, 60),
         p_contact: f(p.contact, 200)
       }).then(function (r) {
-        if (r.error) return { ok: false, error: r.error.message };
+        if (r.error) return { ok: false, error: 'request_failed' };
         return (r.data && typeof r.data === 'object') ? r.data : { ok: false, error: 'bad_response' };
       }).catch(function () { return { ok: false, error: 'network' }; });
     },
@@ -1171,7 +1171,7 @@
         acct: acct,
         avatar_in: String(avatar || ''),
         terms_accepted_in: !!termsAccepted
-      }).then(function (r) { return r.data || { ok: false, error: (r.error && r.error.message) || 'failed' }; });
+      }).then(function (r) { return r.data || { ok: false, error: 'request_failed' }; });
     },
 
     accountProfile: function (id, username) {
@@ -1195,7 +1195,9 @@
     accountLogin: function (un, hash) {
       if (isReservedUsername(un)) return Promise.resolve({ ok: false, error: 'invalid_username' });
       return sb.rpc('login_account', { un: un, pass: hash }).then(function (r) {
-        var out = r.data || { ok: false, error: (r.error && r.error.message) || 'failed' };
+        // Never surface the raw Postgres error: it can contain internal detail
+        // (function names, configuration state). Map it to a stable code.
+        var out = r.data || { ok: false, error: 'request_failed' };
         if (!out || !out.ok || out.avatar) return out;
         // Older accounts often stored avatars in public.users, not accounts.avatar.
         // Hydrate from the Supabase profile row so switching/login restores the image.
@@ -1213,33 +1215,33 @@
       });
     },
     accountRegister: function (un, hash, ageConfirmed, termsAccepted) {
-      return sb.rpc('register_account', { un: un, pass: hash, age_confirmed: !!ageConfirmed, terms_accepted: !!termsAccepted }).then(function (r) { return r.data || { ok: false, error: (r.error && r.error.message) || 'failed' }; });
+      return sb.rpc('register_account', { un: un, pass: hash, age_confirmed: !!ageConfirmed, terms_accepted: !!termsAccepted }).then(function (r) { return r.data || { ok: false, error: 'request_failed' }; });
     },
     accountAgeStatus: function (id) {
-      return sb.rpc('account_age_status', { acct: id }).then(function (r) { return r.data || { ok: false, error: (r.error && r.error.message) || 'failed' }; });
+      return sb.rpc('account_age_status', { acct: id }).then(function (r) { return r.data || { ok: false, error: 'request_failed' }; });
     },
     accountConfirmAge: function (id) {
-      return sb.rpc('confirm_account_age', { acct: id }).then(function (r) { return r.data || { ok: false, error: (r.error && r.error.message) || 'failed' }; });
+      return sb.rpc('confirm_account_age', { acct: id }).then(function (r) { return r.data || { ok: false, error: 'request_failed' }; });
     },
     accountTermsStatus: function (id) {
-      return sb.rpc('account_terms_status', { acct: id }).then(function (r) { return r.data || { ok: false, error: (r.error && r.error.message) || 'failed' }; });
+      return sb.rpc('account_terms_status', { acct: id }).then(function (r) { return r.data || { ok: false, error: 'request_failed' }; });
     },
     accountConfirmTerms: function (id) {
-      return sb.rpc('confirm_account_terms', { acct: id }).then(function (r) { return r.data || { ok: false, error: (r.error && r.error.message) || 'failed' }; });
+      return sb.rpc('confirm_account_terms', { acct: id }).then(function (r) { return r.data || { ok: false, error: 'request_failed' }; });
     },
     accountDelete: function (id, hash) {
-      return sb.rpc('delete_account', { acct: id, pass: hash }).then(function (r) { return r.data || { ok: false, error: (r.error && r.error.message) || 'failed' }; });
+      return sb.rpc('delete_account', { acct: id, pass: hash }).then(function (r) { return r.data || { ok: false, error: 'request_failed' }; });
     },
     accountRename: function (id, newName) {
       var acct = String(id || '').trim();
       var n = String(newName || '').trim();
       if (!acct || !n) return Promise.resolve({ ok: false, error: 'missing' });
-      return sb.rpc('rename_account', { acct: acct, new_un: n }).then(function (r) { return r.data || { ok: false, error: (r.error && r.error.message) || 'failed' }; });
+      return sb.rpc('rename_account', { acct: acct, new_un: n }).then(function (r) { return r.data || { ok: false, error: 'request_failed' }; });
     },
     purgeIdentityName: function (oldName) {
       var n = String(oldName || '').trim();
       if (!n || !api.uid) return Promise.resolve({ ok: false });
-      return sb.rpc('purge_identity', { un: n }).then(function (r) { return r.data || { ok: false, error: (r.error && r.error.message) || 'failed' }; });
+      return sb.rpc('purge_identity', { un: n }).then(function (r) { return r.data || { ok: false, error: 'request_failed' }; });
     },
     accountLogout: function (id) {
       return sb.rpc('logout_account', { acct: id || null }).then(function (r) { return r.data || { ok: !r.error }; }).catch(function () { return { ok: true }; });

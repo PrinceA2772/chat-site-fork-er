@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test"
+    "test": "node --test test/sanity.test.js test/store.test.js test/server.test.js",
+    "test:live": "node supabase/back-buttons-test.js && node supabase/e2e-test.js",
+    "audit": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
     "express": "^5.2.1",

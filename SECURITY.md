@@ -4,6 +4,18 @@ ptr_29 Chat is a proprietary project (see [LICENSE](LICENSE)). This policy
 explains how to report a security or privacy problem, what is in scope, and
 what you can expect afterwards.
 
+Deeper documentation lives alongside it:
+
+- [Auth.md](Auth.md) — identity, registration, login, sessions, pepper rotation
+- [Data%20Security.md](Data%20Security.md) — storage, transport, access control,
+  uploads, logging, incident response
+- [Threat%20Model.md](Threat%20Model.md) — assets, actors, threats and residual
+  risk
+- [Security%20Checklist.md](Security%20Checklist.md) — change/deploy/periodic
+  checks for maintainers
+- [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) and
+  [ASSETS.md](ASSETS.md) — component and asset provenance
+
 **Please do not report security vulnerabilities in a public GitHub issue, in
 the in-app bug reporter, or on any public social channel.** Use a private
 channel from the list below.
@@ -110,10 +122,18 @@ Notes that are useful when acting on a report:
   `<meta name="ptr29-build">` and `version.json`; ask reporters for that value.
   The in-app reporter attaches it automatically.
 - Supabase egress and the browser-exposed key: only the publishable/anon key is
-  ever shipped to the client. The `service_role` key must never appear in
+  ever shipped to the client. The `service_role`/secret key must never appear in
   `Chatting_updated/public/**`. The one workflow that needs it
   (`.github/workflows/bug-reports-to-issues.yml`) reads it from the
-  `SUPABASE_SERVICE_KEY` Actions secret at run time.
+  `SUPABASE_SECRET_KEY` Actions secret (with `SUPABASE_SERVICE_KEY` accepted as a
+  legacy fallback) at run time.
+- Password pepper: new hashes use the Vault-backed v2 pepper
+  (`supabase/038_pepper_vault.sql`). The v1 pepper in older migrations is a
+  legacy verification fallback only and should be treated as historical, not
+  secret. Rotate by creating a new Vault secret version, bumping
+  `ptr29_current_pepper_version()`, and re-running the migration; see
+  [Auth.md](Auth.md#pepper-rotation). Do not delete old versions until every
+  account has logged in since the rotation.
 - If a credential is suspected to be exposed: rotate it in the Supabase
   dashboard and in GitHub → Settings → Secrets, in that order, then invalidate
   sessions.

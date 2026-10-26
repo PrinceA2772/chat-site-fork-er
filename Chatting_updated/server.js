@@ -80,6 +80,9 @@ app.disable('x-powered-by');
 // Global error handler and logging
 process.on('uncaughtException', (err) => {
   console.error('[uncaughtException]', err && err.stack ? err.stack : err);
+  // An uncaught exception leaves the process in an undefined state. Exit so the
+  // supervisor/container can restart us instead of serving traffic while broken.
+  process.exit(1);
 });
 process.on('unhandledRejection', (reason, promise) => {
   console.error('[unhandledRejection]', reason && reason.stack ? reason.stack : reason);
@@ -112,8 +115,6 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'internal_server_error' });
 });
 app.use('/api/', apiLimiter);
-app.use('/api/admins/', strictLimiter);
-app.use('/api/clear-all', strictLimiter);
 app.use(express.static(path.join(__dirname, 'public'), { fallthrough: true, setHeaders: securityStaticHeaders }));
 
 const UPLOAD_DIR = path.join(__dirname, 'uploads');

@@ -4,8 +4,18 @@
  *
  * Run:  node supabase/e2e-test.js   (from Chatting_updated/)
  */
-const URL = 'https://vjrnabnawhegjdsvbyrc.supabase.co';
-const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqcm5hYm5hd2hlZ2pkc3ZieXJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NTU1NTYsImV4cCI6MjEwMjAzMTU1Nn0.7MbTlgMz3v2GsXuhKKGxdFacKZckUbUte_TKKehCQSM';
+const fs = require('fs');
+const path = require('path');
+
+// Read the same config the browser uses, so tests never carry a stale key.
+const clientSrc = fs.readFileSync(path.join(__dirname, '..', 'public', 'supabase-client.js'), 'utf8');
+const pick = (name) => {
+  const m = clientSrc.match(new RegExp("var\\s+" + name + "\\s*=\\s*'([^']+)'"));
+  if (!m) throw new Error('could not read ' + name + ' from public/supabase-client.js');
+  return m[1];
+};
+const URL = pick('SUPABASE_URL');
+const ANON = pick('SUPABASE_ANON_KEY');
 
 async function anon() {
   const r = await fetch(URL + '/auth/v1/signup', {
